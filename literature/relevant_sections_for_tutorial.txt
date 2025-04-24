@@ -1,0 +1,9 @@
+Relevant Sections for the Tutorial:
+
+ • Zu Beginn des Artikels wird Identification nochmal motiviert und ist hoffentlich nicht zu technisch. Auch Subsection I.A bis I.C und vor allem die Abbildungen sind hoffentlich hilfreich.
+
+ • Sektion II ist dann etwas formaler aber hoffentlich immer noch verständlich.
+
+ • Wenn ihr das halbwegs verdaut habt ist noch Sektion VI.A relevant, da Ihr Euch mit sogenannten noiseless-ID codes beschäftigen werdet.
+
+ • Die Kür wäre, auch Sektion VII.A mal anzusehen, da dies der Code ist, den ich Euch nächste Woche in Software vorstellen möchte.
