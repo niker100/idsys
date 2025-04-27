@@ -1,0 +1,6 @@
+- Wie kann man die Fehlerwahrscheinlichkeit beschränken (Section I. A / I.C) -> worst case collision bound
+- Finite Fields (Section VI.A / VII.A)
+- Zusammenhang zwischen Coderate und Fehlerwahrscheinlichkeit "bei log Größe immer noch gute Zuverlässigkeit"
+Was genau soll das heißen?
+- Welchen Vorteil bietet Randomization? Vermutung: Zusammenhang mit Fehlerwahrscheinlichkeit?
+- 

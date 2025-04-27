@@ -1,0 +1,7 @@
+- Reliability: Balance zw. Coderate und Fehlerwahrscheinlichkeit
+
+- Verhalten der Code-Parameter, wenn Bob mehrere Nachrichten gleichzeitig ansieht (vgl. Section II.F)
+- "soft" verification: Wenn Codewörter nicht 100% übereinstimmen, 
+wie kann man vielleicht doch noch Information daraus extrahieren anstatt einfach nur "keine Übereistimmung"?
+- Wie wirkt sich die Größe der Menge der Nachrichten (kursives U) auf die Performance aus?
+- Wie kann man Information zum Sender zurückspiegeln, um evtl. durch Abhängigkeiten die Performance zu verbesserne?
