@@ -1,0 +1,5 @@
+-Übergang von daten-unabhängigen Codes (mittlerweile nah am theoretischen Effizienzlimit (Shannon)) zu goal-oriented codes
+- linear block (channel) coding: Einfügen von Redundanzen, um Kanalstörung zu beseitigen (|Code| > |Message|) → Der Kanal ist quasi-noiseless
+- noiseless-ID encoding: Code für das ID-Problem, Kanalübertragung als noiseless angenommen
+- noisy-ID encoding: kombinierter Code für ID und Kanal, oft einfach Konkatenierung
+- id code ist nicht bijektiv, Informationen aus der Sender-Message gehen verloren
