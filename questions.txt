@@ -3,4 +3,4 @@
 - Zusammenhang zwischen Coderate und Fehlerwahrscheinlichkeit "bei log Größe immer noch gute Zuverlässigkeit"
 Was genau soll das heißen?
 - Welchen Vorteil bietet Randomization? Vermutung: Zusammenhang mit Fehlerwahrscheinlichkeit?
-- 
+- woher kommt das exponentiell bessere Verhalten in der Effizienz der goal-oriented codes? Im ABschnitt VI. A steht: "For the noiseless channel, a noiseless-ID code can “hash” the message a to a size m that is only a logarithm of the size k of the message and still maintain vanishing collision probability if the noiseless-ID codeword size m (that is also referred to as the block length) grows toward infinity [1]" How?
