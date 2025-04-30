@@ -6,4 +6,5 @@ wie kann man vielleicht doch noch Information daraus extrahieren anstatt einfach
 - Wie wirkt sich die Größe der Menge der Nachrichten (kursives U) auf die Performance aus?
 - Wie kann man Information zum Sender zurückspiegeln, um evtl. durch Abhängigkeiten die Performance zu verbesserne?
 
-- Wenn Nein erkannt wird: nicht verwerfen, sondern Bob wählt neue Nachricht
+-Praktisches Beispiel überlegen und die Parameter darauf optimieren.
+-Eine Normale Übertragung daneben legen und die Performance vergleichen. 
