@@ -8,12 +8,9 @@ identification systems based on various coding schemes.
 
 from .core import (
     IdEncoder, IdDecoder, IdSystem,
-    HashTaggingEncoder, BitwiseCompareDecoder,
-    RandomProjectionEncoder, HammingDistanceDecoder,
     create_id_system, generate_numeric_messages, generate_string_messages
 )
 from .metrics import IdMetrics
-from .visualization import IdVisualizer, InteractiveIdVisualizer
 
 __all__ = [
     'IdEncoder', 'IdDecoder', 'IdSystem',
