@@ -574,7 +574,7 @@ def main():
     os.chdir("output")
     
     # Generate message sets for testing
-    num_messages = 10
+    num_messages = 1000
     string_messages = generate_string_messages(num_messages, length=10)
 
     # Create identification systems for testing
