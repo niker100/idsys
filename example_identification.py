@@ -128,7 +128,8 @@ def explore_parameter_effects(
     message_set: List[Any],
     param_name: str,
     param_values: List[Any],
-    num_trials: int = 100
+    num_trials: int = 100,
+    set_on_decoder: bool = False
 ) -> None:
     """
     Explore how a parameter affects different metrics of the system.
@@ -139,6 +140,7 @@ def explore_parameter_effects(
         param_name: Name of the parameter to vary
         param_values: List of values to test for the parameter
         num_trials: Number of trials for each metric calculation
+        set_on_decoder: If True, set the parameter on the decoder; otherwise, on the encoder
     """
     # Create figure for parameter exploration plots
     fig, axes = plt.subplots(2, 2, figsize=(15, 10))
@@ -152,30 +154,28 @@ def explore_parameter_effects(
     
     # Calculate metrics for each parameter value
     for value in param_values:
-        system.encoder.set_parameters({param_name: value})
-        
+        if set_on_decoder:
+            system.decoder.set_parameters({param_name: value})
+        else:
+            system.encoder.set_parameters({param_name: value})
         # Reliability
         reliability = IdMetrics.reliability(system, message_set, num_trials)
         reliabilities.append(reliability)
-        
         # Error rates
         error_rates = IdMetrics.error_rates(system, message_set, num_trials)
         false_positives.append(error_rates["false_positive_rate"])
         false_negatives.append(error_rates["false_negative_rate"])
-        
         # Collision probability
         collision_prob = IdMetrics.worst_case_collision_probability(
             system, message_set, sample_size=min(10, len(message_set)), num_trials=10
         )
         collision_probs.append(collision_prob)
-    
     # Plot results
     axes[0, 0].plot(param_values, reliabilities, 'b-o', linewidth=2)
     axes[0, 0].set_xlabel(param_name)
     axes[0, 0].set_ylabel('Reliability')
     axes[0, 0].set_title(f'Reliability vs {param_name}')
     axes[0, 0].grid(True, alpha=0.3)
-    
     axes[0, 1].plot(param_values, false_positives, 'r-o', linewidth=2, label='False Positives')
     axes[0, 1].plot(param_values, false_negatives, 'g-s', linewidth=2, label='False Negatives')
     axes[0, 1].set_xlabel(param_name)
@@ -183,19 +183,14 @@ def explore_parameter_effects(
     axes[0, 1].set_title(f'Error Rates vs {param_name}')
     axes[0, 1].grid(True, alpha=0.3)
     axes[0, 1].legend()
-    
     axes[1, 0].plot(param_values, collision_probs, 'm-o', linewidth=2)
     axes[1, 0].set_xlabel(param_name)
     axes[1, 0].set_ylabel('Worst-Case Collision Probability')
     axes[1, 0].set_title(f'Collision Probability vs {param_name}')
     axes[1, 0].grid(True, alpha=0.3)
-    
     # Create a custom plot in the fourth panel
-    # This one shows reliability vs error rates
     axes[1, 1].plot(reliabilities, false_positives, 'ro', label='False Positives')
     axes[1, 1].plot(reliabilities, false_negatives, 'go', label='False Negatives')
-    
-    # Add text labels with parameter values
     for i, value in enumerate(param_values):
         axes[1, 1].annotate(
             f"{param_name}={value}",
@@ -203,13 +198,11 @@ def explore_parameter_effects(
             xytext=(5, 5),
             textcoords="offset points"
         )
-    
     axes[1, 1].set_xlabel('Reliability')
     axes[1, 1].set_ylabel('Error Rate')
     axes[1, 1].set_title('Error Rates vs Reliability Trade-off')
     axes[1, 1].grid(True, alpha=0.3)
     axes[1, 1].legend()
-    
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig(f'parameter_effects_{param_name}.png')
     plt.show()
@@ -283,6 +276,7 @@ def main():
     
     # Create output directory for figures if it doesn't exist
     os.makedirs("output", exist_ok=True)
+    os.chdir("output")
     
     # Generate message sets for testing
     print("Generating message sets...")
@@ -307,35 +301,34 @@ def main():
     
     # Compare system reliability, error rates, and efficiency
     print("Comparing system performance across different code lengths...")
-    code_lengths = [4, 8, 12, 16, 24, 32]
-    compare_systems(systems, string_messages, code_lengths, num_trials=100)
+    code_lengths = [i for i in range(2, 33, 1)]
+    compare_systems(systems, string_messages, code_lengths, num_trials=1000)
     
     # Explore the effect of code length on a single system
     print("\nExploring the effect of code length on system performance...")
     hash_system = create_id_system("hash_tagging", {"code_length": 8})
     explore_parameter_effects(hash_system, string_messages, "code_length", 
-                             code_lengths, num_trials=100)
+                             code_lengths, num_trials=1000, set_on_decoder=False)
     
     # Explore the effect of threshold on a decoder
     print("\nExploring the effect of threshold on system performance...")
     threshold_system = create_id_system("hash_tagging", {"code_length": 16, "threshold": 1.0})
-    thresholds = [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
+    thresholds = [i / 10 for i in range(1, 11)]
     explore_parameter_effects(threshold_system, string_messages, "threshold", 
-                             thresholds, num_trials=100)
+                             thresholds, num_trials=1000, set_on_decoder=True)
     
     # Test robustness to noise
     print("\nTesting system robustness to noise...")
     robust_system = create_id_system("hash_tagging", {"code_length": 16, "threshold": 0.8})
     test_message = string_messages[0]
     noise_levels = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5]
-    create_noise_test(robust_system, test_message, noise_levels, num_trials=100)
+    create_noise_test(robust_system, test_message, noise_levels, num_trials=1000)
     
     # Create a comprehensive dashboard for a system
     print("\nCreating a comprehensive dashboard for the system...")
-    dashboard_system = create_id_system("random_projection", {
+    dashboard_system = create_id_system("hash_tagging", {
         "code_length": 16,
-        "max_distance": 2,
-        "seed": 42
+        "threshold": 0.8
     })
     
     fig = IdVisualizer.create_dashboard(
