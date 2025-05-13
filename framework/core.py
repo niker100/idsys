@@ -10,6 +10,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Any, Optional, Union, Callable
 import hashlib
 import random
+import reedsolo
 
 
 class IdEncoder:
@@ -362,44 +363,153 @@ class HammingDistanceDecoder(IdDecoder):
         Initialize the Hamming distance decoder.
         
         Args:
-            encoder: The encoder used by the sender (for local encoding)
+            encoder: The encoder used to generate codewords (for re-encoding)
             parameters: Dictionary with parameters like:
-                - max_distance: Maximum Hamming distance allowed for identification
+                - max_distance: Maximum Hamming distance for a match
         """
         default_params = {
             "max_distance": 0  # Default to exact match
         }
-        
-        # Set default parameters, then update with any provided parameters
         super().__init__(default_params)
         if parameters:
             self.set_parameters(parameters)
-            
-        self.encoder = encoder
+        self.encoder = encoder  # Store encoder for re-encoding message
             
     def decode(self, received_codeword: np.ndarray, message: Any) -> bool:
         """
-        Decide if the received codeword matches the message.
+        Decide if the message matches based on Hamming distance.
         
         Args:
-            received_codeword: The received codeword
+            received_codeword: The received binary codeword (np.ndarray)
             message: The message to check
             
         Returns:
-            True if identified as matching, False otherwise
+            True if Hamming distance is within max_distance, False otherwise
         """
-        # Encode the message using the same encoder
+        # Re-encode the message locally
         local_codeword = self.encoder.encode(message)
         
-        # Compare the codewords using Hamming distance
-        if len(received_codeword) != len(local_codeword):
+        if not isinstance(received_codeword, np.ndarray) or not isinstance(local_codeword, np.ndarray):
+            # This decoder expects numpy array codewords
             return False
-        
-        # Calculate Hamming distance (count of different bits)
+            
+        if received_codeword.shape != local_codeword.shape:
+            return False  # Codewords must have the same shape
+            
+        # Calculate Hamming distance
         distance = np.sum(received_codeword != local_codeword)
         
-        # Compare with threshold
         return distance <= self.parameters["max_distance"]
+
+
+class PaperTaggingEncoder(IdEncoder):
+    """
+    Encoder implementing the tagging scheme from the paper, using a Reed-Solomon code.
+    Outputs a pair (index, tag_sequence).
+    """
+    def __init__(self, parameters: Optional[Dict[str, Any]] = None):
+        default_params = {
+            "M": 32,  # Codeword length
+            "k": 8,   # Message length
+            "code_length": 8,  # Tag length
+            "rs_prim": 0x11d,  # Primitive polynomial for GF(2^8)
+            "rs_fcr": 0,      # First consecutive root
+            "rs_generator": 2 # Generator
+        }
+        super().__init__(default_params)
+        if parameters:
+            self.set_parameters(parameters)
+        self.rs = reedsolo.RSCodec(
+            nsize=self.parameters["M"],
+            nsym=self.parameters["k"],
+            fcr=self.parameters["rs_fcr"],
+            generator=self.parameters["rs_generator"],
+            prim=self.parameters["rs_prim"]
+        )
+
+    def encode(self, message: Any) -> Tuple[int, np.ndarray]:
+        M = self.parameters["M"]
+        k = self.parameters["k"]
+        code_length = self.parameters["code_length"]
+        # Convert message to bytes of length k
+        if isinstance(message, int):
+            msg_bytes = message.to_bytes(k, 'big', signed=False)
+        elif isinstance(message, str):
+            msg_bytes = message.encode('utf-8')[:k].ljust(k, b'\0')
+        elif isinstance(message, bytes):
+            msg_bytes = message[:k].ljust(k, b'\0')
+        else:
+            raise ValueError("Unsupported message type for RS encoding.")
+        # RS encode
+        codeword = self.rs.encode(msg_bytes)
+        codeword = np.frombuffer(codeword, dtype=np.uint8)
+        # Choose pi so tag fits
+        if code_length > M:
+            raise ValueError(f"code_length ({code_length}) must be <= M ({M})")
+        pi = random.randint(0, M - code_length)
+        tag = codeword[pi:pi+code_length]
+        return pi, tag
+
+
+class PaperTaggingDecoder(IdDecoder):
+    """
+    Decoder for the PaperTaggingEncoder (using Reed-Solomon code).
+    Verifies by recomputing the tag at the given index.
+    """
+    def __init__(self, encoder_parameters: Optional[Dict[str, Any]] = None, parameters: Optional[Dict[str, Any]] = None):
+        default_params = {
+            "M": 32,
+            "k": 8,
+            "code_length": 8,
+            "rs_prim": 0x11d,
+            "rs_fcr": 0,
+            "rs_generator": 2
+        }
+        super().__init__(default_params)
+        if encoder_parameters:
+            self.set_parameters(encoder_parameters)
+        if parameters:
+            self.set_parameters(parameters)
+        self.rs = reedsolo.RSCodec(
+            nsize=self.parameters["M"],
+            nsym=self.parameters["k"],
+            fcr=self.parameters["rs_fcr"],
+            generator=self.parameters["rs_generator"],
+            prim=self.parameters["rs_prim"]
+        )
+
+    def _recompute_tag(self, message: Any, pi: int) -> np.ndarray:
+        M = self.parameters["M"]
+        k = self.parameters["k"]
+        code_length = self.parameters["code_length"]
+        if isinstance(message, int):
+            msg_bytes = message.to_bytes(k, 'big', signed=False)
+        elif isinstance(message, str):
+            msg_bytes = message.encode('utf-8')[:k].ljust(k, b'\0')
+        elif isinstance(message, bytes):
+            msg_bytes = message[:k].ljust(k, b'\0')
+        else:
+            raise ValueError("Unsupported message type for RS encoding.")
+        codeword = self.rs.encode(msg_bytes)
+        codeword = np.frombuffer(codeword, dtype=np.uint8)
+        if not (0 <= pi <= M - code_length):
+            raise ValueError(f"Index pi {pi} is out of bounds for M {M} and code_length {code_length}")
+        tag = codeword[pi:pi+code_length]
+        return tag
+
+    def decode(self, codeword: Tuple[int, np.ndarray], message: Any) -> bool:
+        if not isinstance(codeword, tuple) or len(codeword) != 2:
+            return False
+        pi, received_tag = codeword
+        if not isinstance(received_tag, np.ndarray):
+            return False
+        try:
+            recomputed_tag = self._recompute_tag(message, pi)
+            if recomputed_tag.shape != received_tag.shape:
+                return False
+        except Exception:
+            return False
+        return np.array_equal(received_tag, recomputed_tag)
 
 
 def create_id_system(system_type: str = "hash_tagging", parameters: Optional[Dict[str, Any]] = None) -> IdSystem:
@@ -407,7 +517,7 @@ def create_id_system(system_type: str = "hash_tagging", parameters: Optional[Dic
     Factory function to create an identification system.
     
     Args:
-        system_type: Type of system to create ('hash_tagging' or 'random_projection')
+        system_type: Type of system to create ('hash_tagging', 'random_projection', or 'paper_tagging')
         parameters: Dictionary of parameters for the system
         
     Returns:
@@ -417,10 +527,21 @@ def create_id_system(system_type: str = "hash_tagging", parameters: Optional[Dic
     
     if system_type == "hash_tagging":
         encoder = HashTaggingEncoder(parameters)
-        decoder = BitwiseCompareDecoder(encoder, parameters)
+        # BitwiseCompareDecoder needs an encoder instance to re-encode messages
+        # It also uses its own 'threshold' parameter.
+        decoder_params = {"threshold": parameters.get("threshold", 1.0)}
+        decoder = BitwiseCompareDecoder(encoder, decoder_params)
     elif system_type == "random_projection":
         encoder = RandomProjectionEncoder(parameters)
-        decoder = HammingDistanceDecoder(encoder, {"max_distance": parameters.get("max_distance", 0)})
+        # HammingDistanceDecoder needs an encoder instance and 'max_distance'
+        decoder_params = {"max_distance": parameters.get("max_distance", 0)}
+        decoder = HammingDistanceDecoder(encoder, decoder_params)
+    elif system_type == "paper_tagging":
+        # Parameters like M, hash_function, and now code_length are for the encoder
+        # and also needed by the decoder for its re-computation process.
+        encoder = PaperTaggingEncoder(parameters)
+        # The decoder needs the same relevant parameters used by the encoder.
+        decoder = PaperTaggingDecoder(encoder_parameters=parameters)
     else:
         raise ValueError(f"Unknown system type: {system_type}")
     

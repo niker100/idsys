@@ -49,6 +49,7 @@ def compare_systems(
         reliabilities = []
         for code_length in code_lengths:
             system.encoder.set_parameters({"code_length": code_length})
+            system.decoder.set_parameters({"code_length": code_length})
             reliability = IdMetrics.reliability(system, message_set, num_trials)
             reliabilities.append(reliability)
         
@@ -67,6 +68,7 @@ def compare_systems(
         fp_rates = []
         for code_length in code_lengths:
             system.encoder.set_parameters({"code_length": code_length})
+            system.decoder.set_parameters({"code_length": code_length})
             error_rates = IdMetrics.error_rates(system, message_set, num_trials)
             fp_rates.append(error_rates["false_positive_rate"])
         
@@ -85,6 +87,7 @@ def compare_systems(
         collision_probs = []
         for code_length in code_lengths:
             system.encoder.set_parameters({"code_length": code_length})
+            system.decoder.set_parameters({"code_length": code_length})
             collision_prob = IdMetrics.worst_case_collision_probability(
                 system, message_set, sample_size=min(10, len(message_set)), num_trials=10
             )
@@ -105,6 +108,7 @@ def compare_systems(
         code_rates = []
         for code_length in code_lengths:
             system.encoder.set_parameters({"code_length": code_length})
+            system.decoder.set_parameters({"code_length": code_length})
             efficiency = IdMetrics.efficiency(system)
             code_rates.append(efficiency["code_rate"])
         
@@ -156,8 +160,8 @@ def explore_parameter_effects(
     for value in param_values:
         if set_on_decoder:
             system.decoder.set_parameters({param_name: value})
-        else:
-            system.encoder.set_parameters({param_name: value})
+        
+        system.encoder.set_parameters({param_name: value})
         # Reliability
         reliability = IdMetrics.reliability(system, message_set, num_trials)
         reliabilities.append(reliability)
@@ -296,6 +300,11 @@ def main():
         "Hash Tagging (90% threshold)": create_id_system("hash_tagging", {
             "code_length": 16,
             "threshold": 0.9
+        }),
+        "Paper Tagging": create_id_system("paper_tagging", {
+            "M": 32, # Length of the codeword Tu
+            "k": 8,
+            "code_length": 8, # Length of one symbol
         })
     }
     
@@ -306,9 +315,15 @@ def main():
     
     # Explore the effect of code length on a single system
     print("\nExploring the effect of code length on system performance...")
-    hash_system = create_id_system("hash_tagging", {"code_length": 8})
+    hash_system = create_id_system("paper_tagging", {"code_length": 8})
     explore_parameter_effects(hash_system, string_messages, "code_length", 
-                             code_lengths, num_trials=1000, set_on_decoder=False)
+                             code_lengths, num_trials=1000, set_on_decoder=True)
+    
+    print("\nExploring the effect of hash length on system performance...")
+    paper_system = create_id_system("paper_tagging", {"M": 16, "k": "8", "code_length": 8})
+    hash_lengths = [i for i in range(16, 128, 8)]
+    explore_parameter_effects(paper_system, string_messages, "M", 
+                             hash_lengths, num_trials=1000, set_on_decoder=True)
     
     # Explore the effect of threshold on a decoder
     print("\nExploring the effect of threshold on system performance...")
