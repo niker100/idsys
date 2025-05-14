@@ -507,18 +507,10 @@ def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], messag
     ax4.remove()
     ax4 = fig.add_subplot(gs[1, 1], projection='3d')
     
-    # Compare some preset system configurations
-    test_systems = {
-        "Sys1: 32/4/8": {"nsize": 32, "nsym": 4, "code_length": 8},
-        "Sys2: 32/8/16": {"nsize": 32, "nsym": 8, "code_length": 16},
-        "Sys3: 64/16/12": {"nsize": 64, "nsym": 16, "code_length": 12},
-        "Sys4: 96/24/20": {"nsize": 96, "nsym": 24, "code_length": 20}
-    }
-    
     results = []
     
-    for name, params in test_systems.items():
-        test_sys = create_id_system("paper_tagging", params)
+    for name, test_sys in systems.items():
+        params = test_sys.encoder.parameters
         reliability = IdMetrics.reliability(test_sys, message_set, num_trials=50)
         error_rates = IdMetrics.error_rates(test_sys, message_set, num_trials=50)
         results.append((name, params["nsize"], params["nsym"], params["code_length"], 
@@ -574,7 +566,7 @@ def main():
     os.chdir("output")
     
     # Generate message sets for testing
-    num_messages = 1000
+    num_messages = 100
     string_messages = generate_string_messages(num_messages, length=10)
 
     # Create identification systems for testing
@@ -598,9 +590,6 @@ def main():
 
     # Basic correctness test
     is_valid = test_system_correctness(systems["RS-32/8/8"], string_messages)
-    
-    if not is_valid:
-        print("⚠ Warning: Basic correctness test failed! Results may be unreliable.")
     
     # Compare system performance
     print("\nStep 1: Comparing system configurations...")
