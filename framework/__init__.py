@@ -14,8 +14,7 @@ from .metrics import IdMetrics
 
 __all__ = [
     'IdEncoder', 'IdDecoder', 'IdSystem',
-    'HashTaggingEncoder', 'BitwiseCompareDecoder',
-    'RandomProjectionEncoder', 'HammingDistanceDecoder',
+    'PaperTaggingEncoder', 'PaperTaggingDecoder',
     'create_id_system', 'generate_numeric_messages', 'generate_string_messages',
-    'IdMetrics', 'IdVisualizer', 'InteractiveIdVisualizer'
+    'IdMetrics'
 ]
