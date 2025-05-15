@@ -23,346 +23,7 @@ from framework import (
     generate_numeric_messages, generate_string_messages,
     IdMetrics
 )
-
-
-def compare_systems(
-    systems: Dict[str, IdSystem],
-    message_set: List[Any],
-    code_lengths: List[int],
-    num_trials: int = 100
-) -> None:
-    """
-    Compare multiple identification systems across different metrics.
-    
-    Args:
-        systems: Dictionary mapping system names to IdSystem instances
-        message_set: Set of messages to use for testing
-        code_lengths: List of code lengths to test
-        num_trials: Number of trials for each metric calculation
-    """
-    # Setup visualization
-    sns.set_style("whitegrid")
-    plt.rcParams.update({'font.size': 11})
-    
-    # Create figure with custom layout
-    fig = plt.figure(figsize=(16, 10))
-    gs = GridSpec(3, 3, figure=fig)
-    
-    ax1 = fig.add_subplot(gs[0, 0:2])  # Reliability (main metric)
-    ax2 = fig.add_subplot(gs[0, 2])     # False positive rate
-    ax3 = fig.add_subplot(gs[1, 0])     # Collision probability
-    ax4 = fig.add_subplot(gs[1, 1])     # Code rate
-    ax5 = fig.add_subplot(gs[1, 2])     # Trade-off plot
-    ax_table = fig.add_subplot(gs[2, :])  # Summary table
-    ax_table.axis('off')
-    
-    fig.suptitle("Identification System Comparison", fontsize=16)
-    
-    # Colors and markers for different systems
-    colors = sns.color_palette("muted", n_colors=len(systems))
-    markers = ['o', 's', 'D', '^', 'v', '<', '>', 'p']
-    
-    print("\nComparing identification systems...")
-    comparison_data = {}
-    
-    # Collect data for all metrics at once to minimize redundant calculations
-    for i, (name, system) in enumerate(systems.items()):
-        print(f"Testing system: {name}")
-        reliabilities = []
-        fp_rates = []
-        fn_rates = []
-        collision_probs = []
-        code_rates = []
-        
-        for code_length in code_lengths:
-            # Set parameters for both encoder and decoder
-            system.encoder.set_parameters({"code_length": code_length})
-            system.decoder.set_parameters({"code_length": code_length})
-            
-            # Calculate all metrics
-            reliability = IdMetrics.reliability(system, message_set, num_trials)
-            error_rates = IdMetrics.error_rates(system, message_set, num_trials)
-            collision_prob = IdMetrics.worst_case_collision_probability(
-                system, message_set, sample_size=min(10, len(message_set)), num_trials=10
-            )
-            efficiency = IdMetrics.efficiency(system)
-            
-            # Store results
-            reliabilities.append(reliability)
-            fp_rates.append(error_rates["false_positive_rate"])
-            fn_rates.append(error_rates["false_negative_rate"])
-            collision_probs.append(collision_prob)
-            code_rates.append(efficiency["code_rate"])
-        
-        # Store all data for this system
-        comparison_data[name] = {
-            "reliabilities": reliabilities,
-            "fp_rates": fp_rates,
-            "fn_rates": fn_rates,
-            "collision_probs": collision_probs,
-            "code_rates": code_rates
-        }
-        
-        # Plot data for this system
-        color = colors[i % len(colors)]
-        marker = markers[i % len(markers)]
-        
-        # Reliability plot (main metric)
-        ax1.plot(code_lengths, reliabilities, marker=marker, linestyle='-',
-                color=color, linewidth=2, label=name)
-        
-        # FP rate plot
-        ax2.plot(code_lengths, fp_rates, marker=marker, linestyle='-',
-                color=color, linewidth=2, label=name)
-        
-        # Collision probability
-        ax3.plot(code_lengths, collision_probs, marker=marker, linestyle='-',
-                color=color, linewidth=2, label=name)
-        
-        # Code rate
-        ax4.plot(code_lengths, code_rates, marker=marker, linestyle='-',
-                color=color, linewidth=2, label=name)
-        
-        # Trade-off plot (reliability vs fp rate)
-        ax5.scatter(reliabilities, fp_rates, s=80, c=[color], marker=marker, label=name, alpha=0.7)
-        
-    # Customize plots
-    ax1.set_xlabel('Code Length (bits)')
-    ax1.set_ylabel('Reliability')
-    ax1.set_title('System Reliability vs Code Length', fontweight='bold')
-    ax1.set_ylim(0, 1.05)
-    ax1.grid(True, alpha=0.3)
-    ax1.legend(loc='lower right')
-    
-    ax2.set_xlabel('Code Length (bits)')
-    ax2.set_ylabel('False Positive Rate')
-    ax2.set_title('False Positive Rate', fontweight='bold')
-    ax2.set_ylim(0, 1.05)
-    ax2.grid(True, alpha=0.3)
-    
-    ax3.set_xlabel('Code Length (bits)')
-    ax3.set_ylabel('Collision Probability')
-    ax3.set_title('Collision Probability', fontweight='bold')
-    ax3.set_ylim(0, 1.05)
-    ax3.grid(True, alpha=0.3)
-    
-    ax4.set_xlabel('Code Length (bits)')
-    ax4.set_ylabel('Code Rate')
-    ax4.set_title('Code Rate (Efficiency)', fontweight='bold')
-    ax4.grid(True, alpha=0.3)
-    
-    ax5.set_xlabel('Reliability')
-    ax5.set_ylabel('False Positive Rate')
-    ax5.set_title('Reliability vs FP Rate Trade-off', fontweight='bold')
-    ax5.grid(True, alpha=0.3)
-    ax5.legend(loc='upper right')
-    
-    # Generate summary data for table
-    system_names = list(systems.keys())
-    data_rows = []
-    metrics = ["Avg. Reliability", "Avg. FP Rate", "Avg. Collision Prob.", "Avg. Code Rate"]
-    
-    for name in system_names:
-        data = comparison_data[name]
-        avg_rel = np.mean(data["reliabilities"])
-        avg_fp = np.mean(data["fp_rates"])
-        avg_coll = np.mean(data["collision_probs"])
-        avg_rate = np.mean(data["code_rates"])
-        data_rows.append([f"{avg_rel:.4f}", f"{avg_fp:.4f}", f"{avg_coll:.4f}", f"{avg_rate:.4f}"])
-    
-    # Create table
-    table = ax_table.table(
-        cellText=data_rows,
-        rowLabels=system_names,
-        colLabels=metrics,
-        loc='center',
-        cellLoc='center',
-        colWidths=[0.12, 0.12, 0.12, 0.12]
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1, 1.5)
-    for key, cell in table.get_celld().items():
-        if key[0] == 0:  # Header row
-            cell.set_text_props(weight='bold', color='white')
-            cell.set_facecolor('#4472C4')
-        elif key[1] == -1:  # First column (system names)
-            cell.set_text_props(weight='bold')
-            cell.set_facecolor('#D9E1F2')
-        else:
-            cell.set_facecolor('#E9EDF4')
-    
-    # Add insights based on data
-    optimal_lengths = {}
-    for name, data in comparison_data.items():
-        # Find optimal code length where reliability >= 0.95 and FP rate < 0.1
-        optimal_idx = None
-        for i, (rel, fp) in enumerate(zip(data["reliabilities"], data["fp_rates"])):
-            if rel >= 0.95 and fp < 0.1:
-                optimal_idx = i
-                break
-        if optimal_idx is not None:
-            optimal_lengths[name] = code_lengths[optimal_idx]
-    
-    if optimal_lengths:
-        optimal_text = "Optimal code lengths (reliability ≥ 0.95, FP rate < 0.1):\n"
-        for name, length in optimal_lengths.items():
-            optimal_text += f"• {name}: {length} bits\n"
-        fig.text(0.02, 0.02, optimal_text, fontsize=10, va='bottom', ha='left')
-    
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig('system_comparison.png', dpi=300)
-    print("Comparison analysis completed and saved as 'system_comparison.png'")
-
-
-def explore_parameter_effects(
-    system: IdSystem,
-    message_set: List[Any],
-    param_name: str,
-    param_values: List[Any],
-    num_trials: int = 100,
-    set_on_decoder: bool = True
-) -> None:
-    """
-    Explore how a parameter affects different metrics of the system.
-    
-    Args:
-        system: The identification system to evaluate
-        message_set: Set of messages to use for testing
-        param_name: Name of the parameter to vary
-        param_values: List of values to test for the parameter
-        num_trials: Number of trials for each metric calculation
-        set_on_decoder: If True, set the parameter on both encoder and decoder
-    """
-    # Setup visualization
-    sns.set_style("whitegrid")
-    plt.rcParams.update({'font.size': 11})
-    
-    # Create figure with custom layout
-    fig = plt.figure(figsize=(12, 10))
-    gs = GridSpec(3, 2, figure=fig)
-    
-    ax1 = fig.add_subplot(gs[0, 0])  # Reliability
-    ax2 = fig.add_subplot(gs[0, 1])  # Error rates
-    ax3 = fig.add_subplot(gs[1, 0])  # Collision probability
-    ax4 = fig.add_subplot(gs[1, 1])  # Trade-off
-    ax_heatmap = fig.add_subplot(gs[2, :])  # Impact heatmap
-    
-    fig.suptitle(f"Effect of {param_name} on System Performance", fontsize=16)
-    
-    print(f"\nAnalyzing effect of {param_name} on system performance...")
-    
-    # Store metrics
-    reliabilities = []
-    false_positives = []
-    false_negatives = []
-    collision_probs = []
-    
-    # Calculate all metrics for each parameter value
-    for value in param_values:
-        # Set parameters on both encoder and decoder or just the encoder
-        system.encoder.set_parameters({param_name: value})
-        if set_on_decoder:
-            system.decoder.set_parameters({param_name: value})
-        
-        # Calculate metrics
-        reliability = IdMetrics.reliability(system, message_set, num_trials)
-        error_rates = IdMetrics.error_rates(system, message_set, num_trials)
-        collision_probs = IdMetrics.worst_case_collision_probability(
-            system, message_set, sample_size=min(10, len(message_set)), num_trials=10
-        )
-        
-        # Store results
-        reliabilities.append(reliability)
-        false_positives.append(error_rates["false_positive_rate"])
-        false_negatives.append(error_rates["false_negative_rate"])
-        print(f"Value {value}: Reliability = {reliability:.4f}, FP Rate = {error_rates['false_positive_rate']:.4f}")
-    
-    # Plot results with improved formatting
-    
-    # Reliability plot
-    sns.lineplot(x=param_values, y=reliabilities, ax=ax1, marker='o', linewidth=2, color='#4472C4')
-    ax1.set_xlabel(param_name)
-    ax1.set_ylabel('Reliability')
-    ax1.set_title(f'Reliability vs {param_name}', fontweight='bold')
-    ax1.set_ylim(0, 1.05)
-    ax1.grid(True, alpha=0.3)
-    
-    # Error rates plot
-    ax2.plot(param_values, false_positives, 'r-o', linewidth=2, label='False Positives')
-    ax2.plot(param_values, false_negatives, 'g-s', linewidth=2, label='False Negatives')
-    ax2.set_xlabel(param_name)
-    ax2.set_ylabel('Error Rate')
-    ax2.set_title(f'Error Rates vs {param_name}', fontweight='bold')
-    ax2.set_ylim(0, 1.05)
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
-    
-    # Collision probability plot
-    sns.lineplot(x=param_values, y=collision_probs, ax=ax3, marker='o', linewidth=2, color='#ED7D31')
-    ax3.set_xlabel(param_name)
-    ax3.set_ylabel('Collision Probability')
-    ax3.set_title(f'Collision Probability vs {param_name}', fontweight='bold')
-    ax3.set_ylim(0, 1.05)
-    ax3.grid(True, alpha=0.3)
-    
-    # Custom trade-off plot
-    scatter = ax4.scatter(reliabilities, false_positives, c=param_values, 
-                         cmap='viridis', s=100, alpha=0.7)
-    # Add parameter value labels
-    for i, value in enumerate(param_values):
-        ax4.annotate(
-            f"{value}",
-            (reliabilities[i], false_positives[i]),
-            xytext=(5, 5),
-            textcoords="offset points",
-            fontsize=9
-        )
-    ax4.set_xlabel('Reliability')
-    ax4.set_ylabel('False Positive Rate')
-    ax4.set_title('Reliability vs FP Rate Trade-off', fontweight='bold')
-    ax4.set_xlim(0, 1.05)
-    ax4.set_ylim(0, 1.05)
-    ax4.grid(True, alpha=0.3)
-    cbar = plt.colorbar(scatter, ax=ax4)
-    cbar.set_label(param_name)
-    
-    # Create heatmap of parameter impact
-    # Normalize data for better visualization
-    reliabilities_array = np.array(reliabilities)
-    false_positives_array = np.array(false_positives)
-    collision_probs_array = np.array(collision_probs)
-    
-    norm_reliability = (reliabilities_array - np.min(reliabilities_array)) / (np.max(reliabilities_array) - np.min(reliabilities_array) + 1e-10)
-    norm_fp = (false_positives_array - np.min(false_positives_array)) / (np.max(false_positives_array) - np.min(false_positives_array) + 1e-10)
-    norm_coll = (collision_probs_array - np.min(collision_probs_array)) / (np.max(collision_probs_array) - np.min(collision_probs_array) + 1e-10)
-    
-    # Higher values for reliability are better, but lower values for FP and collision are better
-    impact_scores = norm_reliability - norm_fp - norm_coll
-    
-    # Create a heatmap with parameter values and their impact scores
-    heatmap_data = np.array([impact_scores])
-    sns.heatmap(heatmap_data, cmap="RdYlGn", ax=ax_heatmap, 
-                xticklabels=[str(v) for v in param_values], 
-                yticklabels=["Impact Score"],
-                cbar_kws={'label': 'Overall Impact'})
-    ax_heatmap.set_title(f'Impact of {param_name} on System Performance', fontweight='bold')
-    
-    # Add best value annotation
-    best_idx = np.argmax(impact_scores)
-    best_value = param_values[best_idx]
-    best_reliability = reliabilities[best_idx]
-    best_fp = false_positives[best_idx]
-    
-    note_text = (f"Best {param_name} value: {best_value}\n"
-                f"Reliability: {best_reliability:.4f}\n"
-                f"FP Rate: {best_fp:.4f}")
-    
-    fig.text(0.02, 0.02, note_text, fontsize=10, bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
-    
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig(f'parameter_effects_{param_name}.png', dpi=300)
-    print(f"Parameter analysis completed and saved as 'parameter_effects_{param_name}.png'")
+from framework.utils import compare_systems, explore_parameter_effects
 
 
 def test_system_correctness(system: IdSystem, message_set: List[Any], num_samples: int = 5):
@@ -566,34 +227,36 @@ def main():
     os.chdir("output")
     
     # Generate message sets for testing
-    num_messages = 100
-    string_messages = generate_string_messages(num_messages, length=10)
+    num_messages = 256
+    string_messages = generate_string_messages(num_messages, length=8)
 
     # Create identification systems for testing
     systems = {
-        "RS-32/8/8": create_id_system("paper_tagging", {
-            "nsize": 32,   # total codeword length (data + ECC)
-            "nsym": 8,     # number of ECC symbols
+        "RS-64/4/8": create_id_system("paper_tagging", {
+            "nsize": 64,   # total codeword length (data + ECC)
+            "nsym": 4,     # number of ECC symbols
             "code_length": 8  # length of tag sequence to extract
         }),
-        "RS-32/8/16": create_id_system("paper_tagging", {
-            "nsize": 32,   # total codeword length
+        "RS-64/8/8": create_id_system("paper_tagging", {
+            "nsize": 64,   # total codeword length
             "nsym": 8,     # number of ECC symbols
-            "code_length": 16  # length of tag sequence
+            "code_length": 8  # length of tag sequence
         }),
         "RS-64/16/8": create_id_system("paper_tagging", {
-            "nsize": 64,   # total codeword length
-            "nsym": 16,    # number of ECC symbols
+            "nsize": 64,    # total codeword length
+            "nsym": 16,      # number of ECC symbols
             "code_length": 8  # length of tag sequence
-        })
+        }),
+        "RS-64/32/8": create_id_system("paper_tagging", {
+            "nsize": 64,   # total codeword length
+            "nsym": 32,     # number of ECC symbols
+            "code_length": 8  # length of tag sequence
+        }),
     }
-
-    # Basic correctness test
-    is_valid = test_system_correctness(systems["RS-32/8/8"], string_messages)
     
     # Compare system performance
     print("\nStep 1: Comparing system configurations...")
-    code_lengths = [i for i in range(2, 25, 1)]
+    code_lengths = [i for i in range(2, 64, 1)]
     compare_systems(systems, string_messages, code_lengths, num_trials=1000)
     
     # Parameter effect analysis
@@ -601,14 +264,14 @@ def main():
     
     # Analyze effect of ECC symbols (nsym)
     print("Testing ECC symbol count effect...")
-    rs_system = create_id_system("paper_tagging", {"nsize": 32, "nsym": 4, "code_length": 8})
-    nsym_values = [i for i in range(2, 17, 1)]
+    rs_system = create_id_system("paper_tagging", {"nsize": 64, "nsym": 8, "code_length": 16})
+    nsym_values = [i for i in range(2, 56, 1)]
     explore_parameter_effects(rs_system, string_messages, "nsym", nsym_values, num_trials=1000)
     
     # Analyze effect of code length
     print("Testing code length effect...")
-    rs_system = create_id_system("paper_tagging", {"nsize": 32, "nsym": 8, "code_length": 8})
-    code_lengths = [i for i in range(2, 25, 1)]
+    rs_system = create_id_system("paper_tagging", {"nsize": 64, "nsym": 8, "code_length": 8})
+    code_lengths = [i for i in range(2, 64, 1)]
     explore_parameter_effects(rs_system, string_messages, "code_length", code_lengths, num_trials=1000)
     
     # Create comprehensive parameter optimization dashboard
