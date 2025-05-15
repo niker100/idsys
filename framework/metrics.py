@@ -191,20 +191,16 @@ class IdMetrics:
             Dict with efficiency metrics
         """
         # For RS-based systems, get exact code rate from parameters
-        if hasattr(system.encoder, 'parameters') and 'nsize' in system.encoder.parameters and 'nsym' in system.encoder.parameters:
-            nsize = system.encoder.parameters["nsize"]
-            nsym = system.encoder.parameters["nsym"]
+        if hasattr(system.encoder, 'parameters') and 'message_length' in system.encoder.parameters and 'nsym' in system.encoder.parameters:
+            message_length = system.encoder.parameters["message_length"]
+            nsym = system.encoder.parameters["nsym"]            
+            code_length = system.encoder.parameters["code_length"]
             # Exact code rate calculation for Reed-Solomon
-            code_rate = (nsize - nsym) / nsize
-            # Effective code rate considering only the portion transmitted
-            if 'code_length' in system.encoder.parameters:
-                code_length = system.encoder.parameters["code_length"]
-                effective_code_rate = (nsize - nsym) / code_length if code_length > 0 else 0
-            else:
-                effective_code_rate = code_rate
+            code_rate = (message_length + nsym) / code_length
+            effective_code_rate = (message_length) / code_length           
         else:
             # Fallback to approximation if system doesn't expose RS parameters
-            test_message = 12345
+            test_message = "12345"
             start_time = time.time()
             codeword = system.send(test_message)
             end_time = time.time()
@@ -229,7 +225,7 @@ class IdMetrics:
         
         # Encoding time measurement
         start_time = time.time()
-        system.send(12345)  # Use a consistent test message
+        system.send("12345")  # Use a consistent test message
         encoding_time = time.time() - start_time
         
         return {
