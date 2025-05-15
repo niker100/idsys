@@ -177,12 +177,7 @@ class IdMetrics:
             # Take 95th percentile for conservative bound
             collision_probabilities.append(np.percentile(collisions_per_trial, 95))
 
-        max_collision = max(collision_probabilities) if collision_probabilities else 0
-        if max_collision == 0:
-            print("No tag collisions observed for sampled messages and positions. For RS tags, this is expected.")
-        else:
-            print(f"Observed worst-case collision probability: {max_collision:.8f}")
-        return max_collision
+        return max(collision_probabilities) if collision_probabilities else 0
     
     @staticmethod
     def efficiency(system: IdSystem) -> Dict[str, float]:

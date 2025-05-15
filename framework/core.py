@@ -93,6 +93,7 @@ class PaperTaggingEncoder(IdEncoder):
         codeword = np.frombuffer(codeword, dtype=np.uint8)
         if code_length > nsize:
             raise ValueError(f"code_length ({code_length}) must be <= nsize ({nsize})")
+        # pi = 0  # Always use index 0
         pi = random.randint(0, nsize - code_length)
         tag = codeword[pi:pi+code_length]
         return pi, tag
