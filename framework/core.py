@@ -53,12 +53,13 @@ class PaperTaggingEncoder(IdEncoder):
         nsize: total codeword length (data+ecc)
         nsym: number of ECC symbols
         code_length: tag length (number of consecutive symbols to output)
+        message_length: (optional) length of the message in bytes
     """
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         default_params = {
-            "nsize": 32,      # total codeword length
             "nsym": 8,        # number of ECC symbols
-            "code_length": 8  # tag length
+            "code_length": 8, # tag length
+            "message_length": 4 # message_length is optional
         }
         super().__init__(default_params)
         if parameters:
@@ -66,20 +67,41 @@ class PaperTaggingEncoder(IdEncoder):
         self._init_rs()
 
     def _init_rs(self):
+        # nsize will be set in set_parameters
+        nsym = self.parameters.get("nsym", 8)
+        message_length = self.parameters.get("message_length", 4)
+        nsize = message_length + nsym
+        self.parameters["nsize"] = nsize
         self.rs = reedsolo.RSCodec(
-            nsym=self.parameters["nsym"],
-            nsize=self.parameters["nsize"]
+            nsym=nsym,
+            nsize=nsize
         )
 
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
+        # Always update nsize
+        nsym = self.parameters["nsym"]
+        message_length = self.parameters["message_length"]
+        self.parameters["nsize"] = message_length + nsym
+        # Clamp code_length if needed
+        if "code_length" in self.parameters and self.parameters["code_length"] > self.parameters["nsize"]:
+            self.parameters["code_length"] = self.parameters["nsize"]
         self._init_rs()
 
     def encode(self, message: Any) -> Tuple[int, np.ndarray]:
+        # Infer message_length from the message if not set
+        if "message_length" not in self.parameters or self.parameters["message_length"] is None:
+            self.parameters["message_length"] = self._infer_message_length(message)
+            self.parameters["nsize"] = self.parameters["message_length"] + self.parameters["nsym"]
+            self._init_rs()
         nsize = self.parameters["nsize"]
         nsym = self.parameters["nsym"]
         code_length = self.parameters["code_length"]
         k = nsize - nsym
+        # Clamp code_length if needed
+        if code_length > nsize:
+            code_length = nsize
+            self.parameters["code_length"] = code_length
         # Convert message to bytes of length k
         if isinstance(message, int):
             msg_bytes = message.to_bytes(k, 'big', signed=False)
@@ -91,9 +113,6 @@ class PaperTaggingEncoder(IdEncoder):
             raise ValueError("Unsupported message type for RS encoding.")
         codeword = self.rs.encode(msg_bytes)
         codeword = np.frombuffer(codeword, dtype=np.uint8)
-        if code_length > nsize:
-            raise ValueError(f"code_length ({code_length}) must be <= nsize ({nsize})")
-        # pi = 0  # Always use index 0
         pi = random.randint(0, nsize - code_length)
         tag = codeword[pi:pi+code_length]
         return pi, tag
@@ -102,9 +121,9 @@ class PaperTaggingEncoder(IdEncoder):
 class PaperTaggingDecoder(IdDecoder):
     def __init__(self, encoder_parameters: Optional[Dict[str, Any]] = None, parameters: Optional[Dict[str, Any]] = None):
         default_params = {
-            "nsize": 32,
             "nsym": 8,
-            "code_length": 8
+            "code_length": 8,
+            "message_length": 4  # default message length
         }
         super().__init__(default_params)
         if encoder_parameters:
@@ -114,13 +133,24 @@ class PaperTaggingDecoder(IdDecoder):
         self._init_rs()
 
     def _init_rs(self):
+        nsym = self.parameters.get("nsym", 8)
+        message_length = self.parameters.get("message_length", 4)
+        nsize = message_length + nsym
+        self.parameters["nsize"] = nsize
         self.rs = reedsolo.RSCodec(
-            nsym=self.parameters["nsym"],
-            nsize=self.parameters["nsize"]
+            nsym=nsym,
+            nsize=nsize
         )
 
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
+        if "message_length" not in parameters and "message_length" not in self.parameters:
+            self.parameters["message_length"] = 4
         super().set_parameters(parameters)
+        nsym = self.parameters["nsym"]
+        message_length = self.parameters["message_length"]
+        self.parameters["nsize"] = message_length + nsym
+        if "code_length" in self.parameters and self.parameters["code_length"] > self.parameters["nsize"]:
+            self.parameters["code_length"] = self.parameters["nsize"]
         self._init_rs()
 
     def _recompute_tag(self, message: Any, pi: int) -> np.ndarray:
@@ -172,5 +202,6 @@ def generate_numeric_messages(count: int, min_value: int = 0, max_value: int = 1
 
 
 def generate_string_messages(count: int, length: int = 10) -> List[str]:
-    chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    # chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    chars = "AAAAAB"
     return [''.join(random.choice(chars) for _ in range(length)) for _ in range(count)]
