@@ -546,135 +546,211 @@ def explore_parameter_effects(
     print(f"Parameter analysis completed and saved as 'parameter_effects_{param_name}.png'")
 
 
-def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], message_set: List[Any]):
+
+def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], 
+                                           message_set: List[Any],
+                                           reliability_threshold: float = 0.95):
     """
-    Create a comprehensive dashboard showing optimal parameter combinations.
-    
+    Create a comprehensive dashboard showing optimal parameter combinations
+    that maximize code rate while meeting a minimum reliability requirement.
+
     Args:
         systems: Dictionary mapping system names to IdSystem instances
         message_set: Set of messages to use for testing
+        reliability_threshold: Minimum required reliability (default: 0.95)
     """
     # Setup visualization
     setup_plot_style("notebook", 1.1)
-    
-    fig = plt.figure(figsize=(14, 10))
-    gs = GridSpec(2, 2, figure=fig)
-    
+
+    fig = plt.figure(figsize=(15, 11))
+    gs = GridSpec(2, 3, figure=fig)
+
     ax1 = fig.add_subplot(gs[0, 0])  # nsym vs code_length for reliability
-    ax2 = fig.add_subplot(gs[0, 1])  # nsym vs code_length for FP rate
-    ax3 = fig.add_subplot(gs[1, 0])  # nsize vs code_length for reliability
-    ax4 = fig.add_subplot(gs[1, 1])  # 3D parameter space visualization
-    
-    fig.suptitle("Parameter Optimization Dashboard", fontsize=16)
-    
+    ax2 = fig.add_subplot(gs[0, 1])  # nsym vs code_length for code rate
+    ax3 = fig.add_subplot(gs[0, 2])  # Constrained optimal solutions
+    ax4 = fig.add_subplot(gs[1, 0])  # nsize vs code_length for reliability (now just for illustration)
+    ax5 = fig.add_subplot(gs[1, 1])  # nsize vs code_length for code rate (now just for illustration)
+    ax6 = fig.add_subplot(gs[1, 2], projection='3d')  # 3D trade-off visualization
+
+    fig.suptitle(f"Parameter Optimization for Maximum Code Rate with Reliability ≥ {reliability_threshold}", 
+                fontsize=16, fontweight='bold')
+
     # Define parameter ranges
-    code_lengths = [2, 4, 6, 8, 12, 16, 20, 24]
-    nsym_values = [2, 4, 6, 8, 10, 12, 14, 16]
-    nsize_values = [32, 48, 64, 96, 128]
-    
+    code_lengths = [i for i in range(1, 17, 1)]
+    nsym_values = [i for i in range(0, 17, 1)]
+
     # Prepare data structures for heatmaps
     rel_data_nsym = np.zeros((len(nsym_values), len(code_lengths)))
-    fp_data_nsym = np.zeros((len(nsym_values), len(code_lengths)))
-    rel_data_nsize = np.zeros((len(nsize_values), len(code_lengths)))
-    
+    rate_data_nsym = np.zeros((len(nsym_values), len(code_lengths)))
+    nsize_debug = np.zeros((len(nsym_values), len(code_lengths)))  # For debug printing
+
     # Base system for testing
     from framework import create_id_system
-    base_system = create_id_system("paper_tagging", {"nsize": 32, "nsym": 8, "code_length": 8})
-    
-    print("\nCreating parameter optimization dashboard...")
-    print("This may take some time. Testing parameter combinations...")
-    
+    base_system = create_id_system("paper_tagging", {"nsym": 8, "code_length": 8})
+
+    print(f"\nCreating parameter optimization dashboard (reliability threshold: {reliability_threshold})...")
+    print("Testing parameter combinations to optimize code rate...")
+
     # Test nsym vs code_length combinations
     for i, nsym in enumerate(nsym_values):
         for j, code_length in enumerate(code_lengths):
-            base_system.encoder.set_parameters({"nsym": nsym, "code_length": code_length})
-            base_system.decoder.set_parameters({"nsym": nsym, "code_length": code_length})
-            
-            reliability = IdMetrics.reliability(base_system, message_set, num_trials=50)
-            error_rates = IdMetrics.error_rates(base_system, message_set, num_trials=50)
-            
+            base_system.encoder.set_parameters({"nsym": nsym, "code_length": code_length, "message_length": len(message_set[0])})
+            base_system.decoder.set_parameters({"nsym": nsym, "code_length": code_length, "message_length": len(message_set[0])})
+            # Debug print nsize
+            nsize = base_system.encoder.parameters.get("nsize", None)
+            nsize_debug[i, j] = nsize if nsize is not None else -1
+
+            reliability = IdMetrics.reliability(base_system, message_set, num_trials=1000)
+            efficiency = IdMetrics.efficiency(base_system)
+            effective_rate = efficiency.get("effective_code_rate", efficiency["code_rate"])
+
             rel_data_nsym[i, j] = reliability
-            fp_data_nsym[i, j] = error_rates["false_positive_rate"]
-    
-    # Test nsize vs code_length combinations
-    for i, nsize in enumerate(nsize_values):
-        for j, code_length in enumerate(code_lengths):
-            base_system.encoder.set_parameters({"nsize": nsize, "code_length": code_length})
-            base_system.decoder.set_parameters({"nsize": nsize, "code_length": code_length})
-            
-            reliability = IdMetrics.reliability(base_system, message_set, num_trials=50)
-            rel_data_nsize[i, j] = reliability
-    
-    # Create heatmaps
-    sns.heatmap(rel_data_nsym, annot=True, fmt=".2f", cmap="YlGnBu", 
+            rate_data_nsym[i, j] = effective_rate
+
+    # The nsize vs code_length plots are now just for illustration/debug
+    rel_data_nsize = nsize_debug.copy()
+    rate_data_nsize = nsize_debug.copy()
+
+    # Create reliability heatmap for nsym vs code_length
+    sns.heatmap(rel_data_nsym, annot=False, fmt=".2f", cmap="YlGnBu", 
                 xticklabels=code_lengths, yticklabels=nsym_values, ax=ax1)
     ax1.set_title("Reliability: nsym vs code_length", fontweight='bold')
     ax1.set_xlabel("Code Length")
     ax1.set_ylabel("ECC Symbols (nsym)")
-    
-    sns.heatmap(fp_data_nsym, annot=True, fmt=".2f", cmap="YlOrRd_r", 
+
+    # Create code rate heatmap for nsym vs code_length
+    sns.heatmap(rate_data_nsym, annot=False, fmt=".2f", cmap="YlOrRd", 
                 xticklabels=code_lengths, yticklabels=nsym_values, ax=ax2)
-    ax2.set_title("False Positive Rate: nsym vs code_length", fontweight='bold')
+    ax2.set_title("Code Rate: nsym vs code_length", fontweight='bold')
     ax2.set_xlabel("Code Length")
     ax2.set_ylabel("ECC Symbols (nsym)")
-    
-    sns.heatmap(rel_data_nsize, annot=True, fmt=".2f", cmap="YlGnBu", 
-                xticklabels=code_lengths, yticklabels=nsize_values, ax=ax3)
-    ax3.set_title("Reliability: nsize vs code_length", fontweight='bold')
+
+    # Create constraint-based visualization (reliability threshold mask)
+    masked_rate_data = np.ma.masked_array(
+        rate_data_nsym, 
+        mask=(rel_data_nsym < reliability_threshold)
+    )
+
+    sns.heatmap(masked_rate_data, annot=False, fmt=".2f", cmap="YlOrRd", 
+                xticklabels=code_lengths, yticklabels=nsym_values, ax=ax3,
+                cbar_kws={'label': 'Code Rate'})
+    ax3.set_title(f"Optimal Code Rate (Reliability ≥ {reliability_threshold})", fontweight='bold')
     ax3.set_xlabel("Code Length")
-    ax3.set_ylabel("Codeword Length (nsize)")
-    
-    # 3D visualization with system comparison
-    ax4.remove()
-    ax4 = fig.add_subplot(gs[1, 1], projection='3d')
-    
+    ax3.set_ylabel("ECC Symbols (nsym)")
+
+    # For illustration: show nsize as a heatmap (not for optimization)
+    sns.heatmap(rel_data_nsize, annot=False, fmt=".0f", cmap="Blues", 
+                xticklabels=code_lengths, yticklabels=nsym_values, ax=ax4)
+    ax4.set_title("nsize (debug): nsym vs code_length", fontweight='bold')
+    ax4.set_xlabel("Code Length")
+    ax4.set_ylabel("ECC Symbols (nsym)")
+
+    sns.heatmap(rate_data_nsize, annot=False, fmt=".0f", cmap="Blues", 
+                xticklabels=code_lengths, yticklabels=nsym_values, ax=ax5)
+    ax5.set_title("nsize (debug): nsym vs code_length", fontweight='bold')
+    ax5.set_xlabel("Code Length")
+    ax5.set_ylabel("ECC Symbols (nsym)")
+
+    # Find optimal configuration (max code rate with reliability >= threshold)
+    valid_configs = np.where(rel_data_nsym >= reliability_threshold)
+    if len(valid_configs[0]) > 0:
+        valid_rates = rate_data_nsym[valid_configs]
+        optimal_idx = np.argmax(valid_rates)
+        optimal_i, optimal_j = valid_configs[0][optimal_idx], valid_configs[1][optimal_idx]
+
+        optimal_nsym = nsym_values[optimal_i]
+        optimal_code_length = code_lengths[optimal_j]
+        optimal_reliability = rel_data_nsym[optimal_i, optimal_j]
+        optimal_rate = rate_data_nsym[optimal_i, optimal_j]
+
+        # Mark optimal point on the constrained heatmap
+        ax3.add_patch(plt.Rectangle((optimal_j, optimal_i), 1, 1, fill=False, 
+                                   edgecolor='green', lw=3))
+    else:
+        optimal_nsym = None
+        optimal_code_length = None
+        optimal_reliability = None
+        optimal_rate = None
+
+    # 3D visualization
+    X, Y = np.meshgrid(code_lengths, nsym_values)
+    surf1 = ax6.plot_surface(X, Y, rel_data_nsym, cmap='Blues', alpha=0.7, label='Reliability')
+    threshold_plane = np.ones_like(X) * reliability_threshold
+    surf2 = ax6.plot_surface(X, Y, threshold_plane, color='r', alpha=0.3)
+
+    if optimal_nsym is not None:
+        ax6.scatter([optimal_code_length], [optimal_nsym], [optimal_reliability], 
+                  color='green', s=100, marker='*')
+        ax6.text(optimal_code_length, optimal_nsym, optimal_reliability + 0.05, 
+               f"Optimal: ({optimal_code_length}, {optimal_nsym})", 
+               color='green', fontweight='bold')
+
+    ax6.set_xlabel('Code Length')
+    ax6.set_ylabel('ECC Symbols (nsym)')
+    ax6.set_zlabel('Reliability')
+    ax6.set_title('Reliability Surface with Threshold', fontweight='bold')
+    ax6.view_init(30, 45)
+
+    # Add a legend placeholder
+    ax6.plot([0], [0], [0], 'b-', label='Reliability Surface')
+    ax6.plot([0], [0], [0], 'r-', label=f'Threshold ({reliability_threshold})')
+    if optimal_nsym is not None:
+        ax6.plot([0], [0], [0], 'g*', markersize=10, label='Optimal Solution')
+    ax6.legend(loc='upper left')
+
+    # Systems comparison (optional)
     results = []
-    
     for name, test_sys in systems.items():
         params = test_sys.encoder.parameters
         reliability = IdMetrics.reliability(test_sys, message_set, num_trials=50)
-        error_rates = IdMetrics.error_rates(test_sys, message_set, num_trials=50)
         efficiency = IdMetrics.efficiency(test_sys)
         effective_rate = efficiency.get("effective_code_rate", efficiency["code_rate"])
-        
-        results.append((name, params["nsize"], params["nsym"], params["code_length"], 
-                        reliability, error_rates["false_positive_rate"], effective_rate))
-    
-    # Plot 3D points
-    colors = sns.color_palette("bright", n_colors=len(results))
-    
-    for i, (name, nsize, nsym, code_length, rel, fp, rate) in enumerate(results):
-        ax4.scatter(code_length, nsym, rel, color=colors[i], s=100, label=name, alpha=0.7)
-        ax4.text(code_length, nsym, rel + 0.05, name, color=colors[i])
-    
-    ax4.set_xlabel('Code Length')
-    ax4.set_ylabel('ECC Symbols (nsym)')
-    ax4.set_zlabel('Reliability')
-    ax4.set_title('3D Optimization Space', fontweight='bold')
-    ax4.view_init(30, 45)
-    ax4.legend(loc='upper left', bbox_to_anchor=(0, 1))
-    
-    # Identify optimal configurations
-    best_rel_idx = np.unravel_index(np.argmax(rel_data_nsym), rel_data_nsym.shape)
-    best_fp_idx = np.unravel_index(np.argmin(fp_data_nsym), fp_data_nsym.shape)
-    
-    best_rel_nsym = nsym_values[best_rel_idx[0]]
-    best_rel_code = code_lengths[best_rel_idx[1]]
-    best_fp_nsym = nsym_values[best_fp_idx[0]]
-    best_fp_code = code_lengths[best_fp_idx[1]]
-    
-    insight_text = (
-        f"Optimal Configurations:\n\n"
-        f"Best for Reliability:\n"
-        f"• nsym = {best_rel_nsym}, code_length = {best_rel_code}\n"
-        f"• Reliability: {rel_data_nsym[best_rel_idx]:.4f}\n\n"
-        f"Best for Low FP Rate:\n"
-        f"• nsym = {best_fp_nsym}, code_length = {best_fp_code}\n"
-        f"• FP Rate: {fp_data_nsym[best_fp_idx]:.4f}"
-    )
-    
-    fig.text(0.02, 0.02, insight_text, fontsize=10, bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
-    
+
+        results.append((name, params.get("nsize", None), params["nsym"], params["code_length"], 
+                      reliability, effective_rate))
+
+    # Insight text
+    if optimal_nsym is not None:
+        insight_text = (
+            f"Optimal Configuration for Maximum Code Rate\n"
+            f"subject to Reliability ≥ {reliability_threshold}:\n\n"
+            f"• nsym = {optimal_nsym}\n"
+            f"• code_length = {optimal_code_length}\n"
+            f"• Achieved Reliability: {optimal_reliability:.4f}\n"
+            f"• Achieved Code Rate: {optimal_rate:.4f}"
+        )
+    else:
+        insight_text = (
+            f"No configurations found that meet the\n"
+            f"minimum reliability threshold of {reliability_threshold}.\n\n"
+            f"Consider lowering the threshold or expanding\n"
+            f"the parameter search space."
+        )
+
+    fig.text(0.02, 0.02, insight_text, fontsize=10, 
+             bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
+
+    # Add system comparison information if available
+    if results:
+        system_text = "Tested Systems:\n\n"
+        for name, nsize, nsym, code_length, rel, rate in results:
+            meets_threshold = "Y" if rel >= reliability_threshold else "N"
+            system_text += f"• {name}: nsym={nsym}, len={code_length}, nsize={nsize}, rel={rel:.2f} {meets_threshold}\n"
+
+        fig.text(0.75, 0.02, system_text, fontsize=9,
+                bbox=dict(facecolor='#F5F5F5', edgecolor='#CCCCCC', boxstyle='round,pad=0.5'))
+
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-    plt.savefig('parameter_optimization_dashboard.png', dpi=300)
-    print("Parameter optimization dashboard created and saved as 'parameter_optimization_dashboard.png'")
+    plt.savefig('parameter_optimization_coderate.png', dpi=300)
+
+    print("Parameter optimization dashboard created and saved as 'parameter_optimization_coderate.png'")
+
+    # Return optimal parameters if found
+    if optimal_nsym is not None:
+        return {
+            "nsym": optimal_nsym,
+            "code_length": optimal_code_length,
+            "reliability": optimal_reliability,
+            "code_rate": optimal_rate
+        }
+    return None
