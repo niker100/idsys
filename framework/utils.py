@@ -18,6 +18,289 @@ from .core import IdSystem
 from .metrics import IdMetrics
 
 
+def setup_plot_style(context="paper", font_scale=1.2):
+    """
+    Set up a consistent plotting style for all visualizations.
+    
+    Args:
+        context: Seaborn context name (paper, notebook, talk, poster)
+        font_scale: Font size scaling factor
+    """
+    plt.style.use('seaborn-v0_8-whitegrid')
+    sns.set_context(context, font_scale=font_scale)
+    plt.rcParams.update({
+        'font.family': 'serif',
+        'font.size': 12,
+        'axes.titlesize': 14,
+        'axes.labelsize': 12
+    })
+
+
+def create_comparison_figure(height_ratios=[1.2, 1, 0.8]):
+    """
+    Create a figure layout for system comparison plots.
+    
+    Args:
+        height_ratios: List of height ratios for the rows
+        
+    Returns:
+        tuple: (figure, list of axes, table axis)
+    """
+    fig = plt.figure(figsize=(18, 12))
+    gs = GridSpec(3, 3, figure=fig, height_ratios=height_ratios)
+    
+    ax1 = fig.add_subplot(gs[0, 0:2])  # Reliability (main metric)
+    ax2 = fig.add_subplot(gs[0, 2])     # False positive rate
+    ax3 = fig.add_subplot(gs[1, 0])     # Collision probability
+    ax4 = fig.add_subplot(gs[1, 1])     # Code rate
+    ax5 = fig.add_subplot(gs[1, 2])     # Trade-off plot
+    ax_table = fig.add_subplot(gs[2, :])  # Summary table
+    ax_table.axis('off')
+    
+    fig.suptitle("Identification System Performance Comparison", fontsize=18, fontweight='bold', y=0.98)
+    
+    return fig, [ax1, ax2, ax3, ax4, ax5], ax_table
+
+
+def plot_reliability(ax, code_lengths, reliabilities, label, color, marker):
+    """
+    Plot reliability data with consistent styling.
+    
+    Args:
+        ax: Matplotlib axis to plot on
+        code_lengths: List of code lengths
+        reliabilities: List of reliability values
+        label: Label for the legend
+        color: Color for the plot line
+        marker: Marker style
+    """
+    ax.plot(code_lengths, reliabilities, marker=marker, linestyle='-',
+            color=color, linewidth=2.5, label=label, markersize=8)
+    ax.set_xlabel('Code Length (bytes)')
+    ax.set_ylabel('Reliability')
+    ax.set_title('System Reliability vs Code Length', fontweight='bold')
+    
+    # True logarithmic scale for reliability focusing on the critical region
+    ax.set_yscale('log')
+    ax.set_ylim(0.5, 1.05)
+    ax.grid(True, alpha=0.3, which='both')
+    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.4f}'.format(y)))
+    
+    # Optional - add 0.95 reliability threshold line
+    add_threshold_line(ax, 0.95, 'Reliability = 0.95', code_lengths[0])
+
+
+def plot_false_positive_rate(ax, code_lengths, fp_rates, label, color, marker, max_fp_rate=None):
+    """
+    Plot false positive rate data with consistent styling.
+    
+    Args:
+        ax: Matplotlib axis to plot on
+        code_lengths: List of code lengths
+        fp_rates: List of false positive rate values
+        label: Label for the legend
+        color: Color for the plot line
+        marker: Marker style
+        max_fp_rate: Maximum false positive rate across all systems (for scaling)
+    """
+    ax.plot(code_lengths, fp_rates, marker=marker, linestyle='-',
+            color=color, linewidth=2.5, label=label, markersize=8)
+    ax.set_xlabel('Code Length (bytes)')
+    ax.set_ylabel('False Positive Rate')
+    ax.set_title('False Positive Rate', fontweight='bold')
+    
+    if max_fp_rate is not None:
+        ax.set_ylim(0, min(1.05, max_fp_rate * 1.1))
+    else:
+        ax.set_ylim(0, 1.05)
+    ax.grid(True, alpha=0.3)
+    
+    # Optional - add 0.1 FP rate threshold line
+    add_threshold_line(ax, 0.1, 'FP Rate = 0.1', code_lengths[0])
+
+
+def plot_collision_probability(ax, code_lengths, collision_probs, label, color, marker):
+    """
+    Plot collision probability data with consistent styling.
+    
+    Args:
+        ax: Matplotlib axis to plot on
+        code_lengths: List of code lengths
+        collision_probs: List of collision probability values
+        label: Label for the legend
+        color: Color for the plot line
+        marker: Marker style
+    """
+    ax.semilogy(code_lengths, collision_probs, marker=marker, linestyle='-',
+                color=color, linewidth=2.5, label=label, markersize=8)
+    ax.set_xlabel('Code Length (bytes)')
+    ax.set_ylabel('Collision Probability (log scale)')
+    ax.set_title('Collision Probability', fontweight='bold')
+    ax.set_ylim(0.001, 1.05)
+    ax.grid(True, alpha=0.3, which='both')
+
+
+def plot_code_rate(ax, code_lengths, effective_rates, label, color, marker):
+    """
+    Plot code rate data with consistent styling.
+    
+    Args:
+        ax: Matplotlib axis to plot on
+        code_lengths: List of code lengths
+        effective_rates: List of effective code rate values
+        label: Label for the legend
+        color: Color for the plot line
+        marker: Marker style
+    """
+    ax.plot(code_lengths, effective_rates, marker=marker, linestyle='-',
+            color=color, linewidth=2.5, label=label, markersize=8)
+    ax.set_xlabel('Code Length (bytes)')
+    ax.set_ylabel('Effective Code Rate')
+    ax.set_title('Effective Code Rate', fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.set_ylim(0, None)
+
+
+def plot_tradeoff(ax, x_values, y_values, sizes, label, color, marker):
+    """
+    Plot a tradeoff scatter plot with consistent styling.
+    
+    Args:
+        ax: Matplotlib axis to plot on
+        x_values: X-axis values (typically reliability)
+        y_values: Y-axis values (typically effective code rate)
+        sizes: Marker sizes (typically proportional to code length)
+        label: Label for the legend
+        color: Color for the plot markers
+        marker: Marker style
+    """
+    ax.scatter(x_values, y_values, s=sizes, c=[color], marker=marker, 
+              label=label, alpha=0.7, edgecolor='w', linewidth=0.5)
+    ax.set_xlabel('Reliability')
+    ax.set_ylabel('Effective Code Rate')
+    ax.set_title('Reliability vs Code Rate Trade-off', fontweight='bold')
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='upper right', frameon=True, fancybox=True, framealpha=0.9)
+
+
+def add_point_annotations(ax, x_values, y_values, annotations, modulo=3):
+    """
+    Add annotations to points on a plot.
+    
+    Args:
+        ax: Matplotlib axis to add annotations to
+        x_values: X-coordinate values
+        y_values: Y-coordinate values
+        annotations: List of annotation texts
+        modulo: Only annotate every nth point (to reduce clutter)
+    """
+    for i, (x, y, text) in enumerate(zip(x_values, y_values, annotations)):
+        if i % modulo == 0:  # Add labels every n points to avoid clutter
+            ax.annotate(
+                f"{text}",
+                (x, y),
+                xytext=(5, 5),
+                textcoords="offset points",
+                fontsize=8,
+                alpha=0.8
+            )
+
+
+def add_threshold_line(ax, y_value, text, x_position, color='r'):
+    """
+    Add a threshold line with label to a plot.
+    
+    Args:
+        ax: Matplotlib axis to add the line to
+        y_value: Y-coordinate for the horizontal line
+        text: Text to display by the line
+        x_position: X-coordinate for the text
+        color: Line and text color
+    """
+    ax.axhline(y=y_value, color=color, linestyle='--', alpha=0.7, linewidth=1)
+    ax.text(x_position, y_value, text, 
+             color=color, va='bottom', ha='left', fontsize=10, alpha=0.7)
+
+
+def create_summary_table(ax, system_names, data_dict):
+    """
+    Create a styled summary table for system comparison.
+    
+    Args:
+        ax: Matplotlib axis to place the table on
+        system_names: List of system names
+        data_dict: Dictionary with metric data for each system
+        
+    Returns:
+        The created table object
+    """
+    # Generate summary data for enhanced table
+    data_rows = []
+    metrics = ["Avg. Reliability", "Avg. FP Rate", "Avg. Collision Prob.", "Avg. Code Rate"]
+    
+    for name in system_names:
+        data = data_dict[name]
+        avg_rel = np.mean(data["reliabilities"])
+        avg_fp = np.mean(data["fp_rates"])
+        avg_coll = np.mean(data["collision_probs"])
+        avg_rate = np.mean(data["effective_rates"])
+        data_rows.append([f"{avg_rel:.4f}", f"{avg_fp:.4f}", f"{avg_coll:.4f}", f"{avg_rate:.4f}"])
+    
+    # Create enhanced summary table
+    table = ax.table(
+        cellText=data_rows,
+        rowLabels=system_names,
+        colLabels=metrics,
+        loc='center',
+        cellLoc='center',
+        colWidths=[0.12, 0.12, 0.12, 0.12]
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.5)
+    
+    # Enhanced table styling
+    for key, cell in table.get_celld().items():
+        if key[0] == 0:  # Header row
+            cell.set_text_props(weight='bold', color='white')
+            cell.set_facecolor('#4472C4')
+        elif key[1] == -1:  # First column (system names)
+            cell.set_text_props(weight='bold')
+            cell.set_facecolor('#D9E1F2')
+        else:
+            cell.set_facecolor('#E9EDF4')
+            # Highlight good/bad values with subtle color
+            if key[1] == 0:  # Reliability (higher is better)
+                val = float(cell.get_text().get_text())
+                if val > 0.95:
+                    cell.set_facecolor('#D5E8D4')  # Light green
+            elif key[1] == 1 or key[1] == 2:  # FP Rate and Collision (lower is better)
+                val = float(cell.get_text().get_text())
+                if val < 0.1:
+                    cell.set_facecolor('#D5E8D4')  # Light green
+                elif val > 0.3:
+                    cell.set_facecolor('#F8CECC')  # Light red
+    
+    return table
+
+
+def add_optimal_length_notes(fig, optimal_lengths, code_lengths):
+    """
+    Add optimal code length notes to the figure.
+    
+    Args:
+        fig: Figure to add notes to
+        optimal_lengths: Dictionary mapping system names to optimal code lengths
+        code_lengths: List of all code lengths tested
+    """
+    if optimal_lengths:
+        optimal_text = "Optimal code lengths (reliability ≥ 0.95, FP rate < 0.1):\n"
+        for name, length in optimal_lengths.items():
+            optimal_text += f"• {name}: {length} bytes\n"
+        fig.text(0.02, 0.02, optimal_text, fontsize=10, va='bottom', ha='left', 
+                 bbox=dict(facecolor='#F5F5F5', edgecolor='#CCCCCC', boxstyle='round,pad=0.5'))
+
+
 def compare_systems(
     systems: Dict[str, IdSystem],
     message_set: List[Any],
@@ -34,28 +317,11 @@ def compare_systems(
         num_trials: Number of trials for each metric calculation
     """
     # Setup visualization with modern style
-    plt.style.use('seaborn-v0_8-whitegrid')
-    sns.set_context("paper", font_scale=1.2)
-    plt.rcParams.update({
-        'font.family': 'serif',
-        'font.size': 12,
-        'axes.titlesize': 14,
-        'axes.labelsize': 12
-    })
+    setup_plot_style()
     
     # Create figure with custom layout
-    fig = plt.figure(figsize=(18, 12))
-    gs = GridSpec(3, 3, figure=fig, height_ratios=[1.2, 1, 0.8])
-    
-    ax1 = fig.add_subplot(gs[0, 0:2])  # Reliability (main metric)
-    ax2 = fig.add_subplot(gs[0, 2])     # False positive rate
-    ax3 = fig.add_subplot(gs[1, 0])     # Collision probability
-    ax4 = fig.add_subplot(gs[1, 1])     # Code rate
-    ax5 = fig.add_subplot(gs[1, 2])     # Trade-off plot
-    ax_table = fig.add_subplot(gs[2, :])  # Summary table
-    ax_table.axis('off')
-    
-    fig.suptitle("Identification System Performance Comparison", fontsize=18, fontweight='bold', y=0.98)
+    fig, axes, ax_table = create_comparison_figure()
+    ax1, ax2, ax3, ax4, ax5 = axes
     
     # Modern color palette for systems
     colors = sns.color_palette("viridis", n_colors=len(systems))
@@ -74,7 +340,7 @@ def compare_systems(
         effective_rates = []
         
         for j, code_length in enumerate(code_lengths):
-            print(f"  Testing code length {code_length} bits ({j+1}/{len(code_lengths)})", end='\r')
+            print(f"  Testing code length {code_length} bytes ({j+1}/{len(code_lengths)})", end='\r')
             
             # Set parameters for both encoder and decoder
             system.encoder.set_parameters({"code_length": code_length})
@@ -110,134 +376,25 @@ def compare_systems(
         color = colors[i % len(colors)]
         marker = markers[i % len(markers)]
         
-        # Reliability plot (main metric) - Using proper logarithmic scale
-        ax1.plot(code_lengths, reliabilities, marker=marker, linestyle='-',
-                color=color, linewidth=2.5, label=name, markersize=8)
+        # Use our utility functions to create consistent plots
+        plot_reliability(ax1, code_lengths, reliabilities, name, color, marker)
+        plot_false_positive_rate(ax2, code_lengths, fp_rates, name, color, marker)
+        plot_collision_probability(ax3, code_lengths, collision_probs, name, color, marker)
+        plot_code_rate(ax4, code_lengths, effective_rates, name, color, marker)
         
-        # FP rate plot
-        ax2.plot(code_lengths, fp_rates, marker=marker, linestyle='-',
-                color=color, linewidth=2.5, label=name, markersize=8)
-        
-        # Collision probability
-        ax3.semilogy(code_lengths, collision_probs, marker=marker, linestyle='-',
-                    color=color, linewidth=2.5, label=name, markersize=8)
-        
-        # Code rate
-        ax4.plot(code_lengths, effective_rates, marker=marker, linestyle='-',
-                color=color, linewidth=2.5, label=name, markersize=8)
-        
-        # Trade-off plot (reliability vs fp rate) with size indicating code length
+        # Trade-off plot with marker sizes indicating code length
         sizes = [20 + cl for cl in code_lengths]
-        ax5.scatter(reliabilities, fp_rates, s=sizes, c=[color], marker=marker, 
-                   label=name, alpha=0.7, edgecolor='w', linewidth=0.5)
+        plot_tradeoff(ax5, reliabilities, effective_rates, sizes, name, color, marker)
     
-    # Customize plots with enhanced styling
-    ax1.set_xlabel('Code Length (bits)')
-    ax1.set_ylabel('Reliability')
-    ax1.set_title('System Reliability vs Code Length', fontweight='bold')
-    
-    # True logarithmic scale for reliability focusing on the critical region
-    ax1.set_yscale('log')
-    ax1.set_ylim(0.5, 1.05)
-    ax1.grid(True, alpha=0.3, which='both')
-    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: '{:.4f}'.format(y)))
+    # Add legends to multi-system plots
     ax1.legend(loc='lower right', frameon=True, fancybox=True, framealpha=0.9)
-    
-    # Add 0.95 reliability threshold line
-    ax1.axhline(y=0.95, color='r', linestyle='--', alpha=0.7, linewidth=1)
-    ax1.text(code_lengths[0], 0.95, 'Reliability = 0.95', 
-             color='r', va='bottom', ha='left', fontsize=10, alpha=0.7)
-    
-    ax2.set_xlabel('Code Length (bits)')
-    ax2.set_ylabel('False Positive Rate')
-    ax2.set_title('False Positive Rate', fontweight='bold')
-    ax2.set_ylim(0, min(1.05, max([max(d["fp_rates"]) for d in comparison_data.values()]) * 1.1))
-    ax2.grid(True, alpha=0.3)
-    
-    # Add 0.1 FP rate threshold line
-    ax2.axhline(y=0.1, color='r', linestyle='--', alpha=0.7, linewidth=1)
-    ax2.text(code_lengths[0], 0.1, 'FP Rate = 0.1', 
-             color='r', va='bottom', ha='left', fontsize=10, alpha=0.7)
-    
-    ax3.set_xlabel('Code Length (bits)')
-    ax3.set_ylabel('Collision Probability (log scale)')
-    ax3.set_title('Collision Probability', fontweight='bold')
-    ax3.set_ylim(0.001, 1.05)
-    ax3.grid(True, alpha=0.3, which='both')
-    
-    ax4.set_xlabel('Code Length (bits)')
-    ax4.set_ylabel('Effective Code Rate')
-    ax4.set_title('Effective Code Rate', fontweight='bold')
-    ax4.grid(True, alpha=0.3)
-    ax4.set_ylim(0, None)
-    
-    # Add legend for marker sizes in trade-off plot
-    ax5.set_xlabel('Reliability')
-    ax5.set_ylabel('False Positive Rate')
-    ax5.set_title('Reliability vs FP Rate Trade-off', fontweight='bold')
-    ax5.grid(True, alpha=0.3)
-    ax5.legend(loc='upper right', frameon=True, fancybox=True, framealpha=0.9)
     
     # Add code length annotations to trade-off points
     for name, data in comparison_data.items():
-        for i, (rel, fp) in enumerate(zip(data["reliabilities"], data["fp_rates"])):
-            if i % 3 == 0:  # Add labels every 3 points to avoid clutter
-                ax5.annotate(
-                    f"{code_lengths[i]}",
-                    (rel, fp),
-                    xytext=(5, 5),
-                    textcoords="offset points",
-                    fontsize=8,
-                    alpha=0.8
-                )
+        add_point_annotations(ax5, data["reliabilities"], data["effective_rates"], code_lengths)
     
-    # Generate summary data for enhanced table
-    system_names = list(systems.keys())
-    data_rows = []
-    metrics = ["Avg. Reliability", "Avg. FP Rate", "Avg. Collision Prob.", "Avg. Code Rate"]
-    
-    for name in system_names:
-        data = comparison_data[name]
-        avg_rel = np.mean(data["reliabilities"])
-        avg_fp = np.mean(data["fp_rates"])
-        avg_coll = np.mean(data["collision_probs"])
-        avg_rate = np.mean(data["effective_rates"])
-        data_rows.append([f"{avg_rel:.4f}", f"{avg_fp:.4f}", f"{avg_coll:.4f}", f"{avg_rate:.4f}"])
-    
-    # Create enhanced summary table
-    table = ax_table.table(
-        cellText=data_rows,
-        rowLabels=system_names,
-        colLabels=metrics,
-        loc='center',
-        cellLoc='center',
-        colWidths=[0.12, 0.12, 0.12, 0.12]
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1, 1.5)
-    
-    # Enhanced table styling
-    for key, cell in table.get_celld().items():
-        if key[0] == 0:  # Header row
-            cell.set_text_props(weight='bold', color='white')
-            cell.set_facecolor('#4472C4')
-        elif key[1] == -1:  # First column (system names)
-            cell.set_text_props(weight='bold')
-            cell.set_facecolor('#D9E1F2')
-        else:
-            cell.set_facecolor('#E9EDF4')
-            # Highlight good/bad values with subtle color
-            if key[1] == 0:  # Reliability (higher is better)
-                val = float(cell.get_text().get_text())
-                if val > 0.95:
-                    cell.set_facecolor('#D5E8D4')  # Light green
-            elif key[1] == 1 or key[1] == 2:  # FP Rate and Collision (lower is better)
-                val = float(cell.get_text().get_text())
-                if val < 0.1:
-                    cell.set_facecolor('#D5E8D4')  # Light green
-                elif val > 0.3:
-                    cell.set_facecolor('#F8CECC')  # Light red
+    # Create summary table
+    create_summary_table(ax_table, list(systems.keys()), comparison_data)
     
     # Add detailed insights based on data
     optimal_lengths = {}
@@ -251,12 +408,8 @@ def compare_systems(
         if optimal_idx is not None:
             optimal_lengths[name] = code_lengths[optimal_idx]
     
-    if optimal_lengths:
-        optimal_text = "Optimal code lengths (reliability ≥ 0.95, FP rate < 0.1):\n"
-        for name, length in optimal_lengths.items():
-            optimal_text += f"• {name}: {length} bits\n"
-        fig.text(0.02, 0.02, optimal_text, fontsize=10, va='bottom', ha='left', 
-                 bbox=dict(facecolor='#F5F5F5', edgecolor='#CCCCCC', boxstyle='round,pad=0.5'))
+    # Add optimal length notes
+    add_optimal_length_notes(fig, optimal_lengths, code_lengths)
     
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     
@@ -285,14 +438,13 @@ def explore_parameter_effects(
         set_on_decoder: If True, set the parameter on both encoder and decoder
     """
     # Setup visualization
-    sns.set_style("whitegrid")
-    plt.rcParams.update({'font.size': 11})
+    setup_plot_style("notebook", 1.1)
     
     fig = plt.figure(figsize=(12, 10))
     gs = GridSpec(3, 2, figure=fig)
     
     ax1 = fig.add_subplot(gs[0, 0])  # Reliability
-    ax2 = fig.add_subplot(gs[0, 1])  # Error rates (only false positives now)
+    ax2 = fig.add_subplot(gs[0, 1])  # Error rates
     ax3 = fig.add_subplot(gs[1, 0])  # Collision probability
     ax4 = fig.add_subplot(gs[1, 1])  # Trade-off
     ax_heatmap = fig.add_subplot(gs[2, :])  # Impact heatmap
@@ -305,6 +457,7 @@ def explore_parameter_effects(
     reliabilities = []
     false_positives = []
     collision_probs = []
+    effective_rates = []
     
     # Calculate all metrics for each parameter value
     for value in param_values:
@@ -319,55 +472,36 @@ def explore_parameter_effects(
         collision_prob = IdMetrics.worst_case_collision_probability(
             system, message_set, sample_size=min(10, len(message_set)), num_trials=10
         )
+        efficiency = IdMetrics.efficiency(system)
         
         # Store results
         reliabilities.append(reliability)
         false_positives.append(error_rates["false_positive_rate"])
         collision_probs.append(collision_prob)
+        effective_rates.append(efficiency.get("effective_code_rate", efficiency["code_rate"]))
+        
         print(f"Value {value}: Reliability = {reliability:.4f}, FP Rate = {error_rates['false_positive_rate']:.4f}")
     
-    # Plot results with improved formatting
+    # Use unified plotting functions for consistent style
+    color = '#4472C4'
+    plot_reliability(ax1, param_values, reliabilities, param_name, color, 'o')
+    ax1.set_xlabel(param_name)  # Override the default label
     
-    # Reliability plot
-    sns.lineplot(x=param_values, y=reliabilities, ax=ax1, marker='o', linewidth=2, color='#4472C4')
-    ax1.set_xlabel(param_name)
-    ax1.set_ylabel('Reliability')
-    ax1.set_title(f'Reliability vs {param_name}', fontweight='bold')
-    ax1.set_yscale('log')
-    ax1.set_ylim(0.5, 1.05)
-    ax1.grid(True, alpha=0.3)
+    plot_false_positive_rate(ax2, param_values, false_positives, param_name, '#ED7D31', 'o')
+    ax2.set_xlabel(param_name)  # Override the default label
     
-    # Error rates plot - Only false positives
-    sns.lineplot(x=param_values, y=false_positives, ax=ax2, marker='o', linewidth=2, color='#ED7D31')
-    ax2.set_xlabel(param_name)
-    ax2.set_ylabel('False Positive Rate')
-    ax2.set_title(f'False Positive Rate vs {param_name}', fontweight='bold')
-    ax2.set_ylim(0, 1.05)
-    ax2.grid(True, alpha=0.3)
-    
-    # Collision probability plot
-    sns.lineplot(x=param_values, y=collision_probs, ax=ax3, marker='o', linewidth=2, color='#ED7D31')
-    ax3.set_xlabel(param_name)
-    ax3.set_ylabel('Collision Probability')
-    ax3.set_title(f'Collision Probability vs {param_name}', fontweight='bold')
-    ax3.set_ylim(0, 1.05)
-    ax3.grid(True, alpha=0.3)
+    plot_collision_probability(ax3, param_values, collision_probs, param_name, '#ED7D31', 'o')
+    ax3.set_xlabel(param_name)  # Override the default label
     
     # Custom trade-off plot
-    scatter = ax4.scatter(reliabilities, false_positives, c=param_values, 
+    scatter = ax4.scatter(reliabilities, effective_rates, c=param_values, 
                          cmap='viridis', s=100, alpha=0.7)
     # Add parameter value labels
-    for i, value in enumerate(param_values):
-        ax4.annotate(
-            f"{value}",
-            (reliabilities[i], false_positives[i]),
-            xytext=(5, 5),
-            textcoords="offset points",
-            fontsize=9
-        )
+    add_point_annotations(ax4, reliabilities, effective_rates, param_values, modulo=1)
+    
     ax4.set_xlabel('Reliability')
-    ax4.set_ylabel('False Positive Rate')
-    ax4.set_title('Reliability vs FP Rate Trade-off', fontweight='bold')
+    ax4.set_ylabel('Effective Code Rate')
+    ax4.set_title('Reliability vs Code Rate Trade-off', fontweight='bold')
     ax4.grid(True, alpha=0.3)
     cbar = plt.colorbar(scatter, ax=ax4)
     cbar.set_label(param_name)
@@ -398,75 +532,18 @@ def explore_parameter_effects(
     best_value = param_values[best_idx]
     best_reliability = reliabilities[best_idx]
     best_fp = false_positives[best_idx]
+    best_rate = effective_rates[best_idx]
     
     note_text = (f"Best {param_name} value: {best_value}\n"
                 f"Reliability: {best_reliability:.4f}\n"
-                f"FP Rate: {best_fp:.4f}")
+                f"FP Rate: {best_fp:.4f}\n"
+                f"Code Rate: {best_rate:.4f}")
     
     fig.text(0.02, 0.02, note_text, fontsize=10, bbox=dict(facecolor='white', alpha=0.8, boxstyle='round,pad=0.5'))
     
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig(f'parameter_effects_{param_name}.png', dpi=300)
     print(f"Parameter analysis completed and saved as 'parameter_effects_{param_name}.png'")
-
-
-def test_system_correctness(system: IdSystem, message_set: List[Any], num_samples: int = 5):
-    """
-    Test basic correctness of an identification system.
-    
-    Args:
-        system: The identification system to test
-        message_set: Set of messages to test with
-        num_samples: Number of messages to sample for testing
-    """
-    if num_samples > len(message_set):
-        num_samples = len(message_set)
-        
-    sample_messages = message_set[:num_samples]
-    
-    print("\nValidating system correctness...")
-    
-    results = {
-        "tests_performed": 0,
-        "passed": 0,
-        "failed": 0,
-        "false_positives": 0,
-        "false_positives": 0
-    }
-    
-    for message in sample_messages:
-        # Encode
-        codeword = system.send(message)
-        
-        # Decode with same message (should be True)
-        result_same = system.receive(codeword, message)
-        
-        # Decode with different message (should be False)
-        different_idx = (sample_messages.index(message) + 1) % len(sample_messages)
-        different_message = sample_messages[different_idx]
-        result_diff = system.receive(codeword, different_message)
-        
-        # Update results
-        results["tests_performed"] += 1
-        
-        if result_same and not result_diff:
-            results["passed"] += 1
-        else:
-            results["failed"] += 1
-            if not result_same:
-                results["false_positives"] += 1
-            if result_diff:
-                results["false_positives"] += 1
-    
-    # Print summary
-    print(f"System validation summary:")
-    print(f"✓ Tests passed: {results['passed']}/{results['tests_performed']} ({results['passed']/results['tests_performed']*100:.1f}%)")
-    if results["failed"] > 0:
-        print(f"✗ Tests failed: {results['failed']}/{results['tests_performed']}")
-        print(f"  - False positives: {results['false_positives']}")
-        print(f"  - False positives: {results['false_positives']}")
-    
-    return results["passed"] == results["tests_performed"]
 
 
 def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], message_set: List[Any]):
@@ -478,8 +555,7 @@ def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], messag
         message_set: Set of messages to use for testing
     """
     # Setup visualization
-    sns.set_style("whitegrid")
-    plt.rcParams.update({'font.size': 11})
+    setup_plot_style("notebook", 1.1)
     
     fig = plt.figure(figsize=(14, 10))
     gs = GridSpec(2, 2, figure=fig)
@@ -514,7 +590,6 @@ def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], messag
             base_system.encoder.set_parameters({"nsym": nsym, "code_length": code_length})
             base_system.decoder.set_parameters({"nsym": nsym, "code_length": code_length})
             
-            from .metrics import IdMetrics
             reliability = IdMetrics.reliability(base_system, message_set, num_trials=50)
             error_rates = IdMetrics.error_rates(base_system, message_set, num_trials=50)
             
@@ -559,13 +634,16 @@ def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], messag
         params = test_sys.encoder.parameters
         reliability = IdMetrics.reliability(test_sys, message_set, num_trials=50)
         error_rates = IdMetrics.error_rates(test_sys, message_set, num_trials=50)
+        efficiency = IdMetrics.efficiency(test_sys)
+        effective_rate = efficiency.get("effective_code_rate", efficiency["code_rate"])
+        
         results.append((name, params["nsize"], params["nsym"], params["code_length"], 
-                        reliability, error_rates["false_positive_rate"]))
+                        reliability, error_rates["false_positive_rate"], effective_rate))
     
     # Plot 3D points
     colors = sns.color_palette("bright", n_colors=len(results))
     
-    for i, (name, nsize, nsym, code_length, rel, fp) in enumerate(results):
+    for i, (name, nsize, nsym, code_length, rel, fp, rate) in enumerate(results):
         ax4.scatter(code_length, nsym, rel, color=colors[i], s=100, label=name, alpha=0.7)
         ax4.text(code_length, nsym, rel + 0.05, name, color=colors[i])
     
@@ -600,22 +678,3 @@ def create_parameter_optimization_dashboard(systems: Dict[str, IdSystem], messag
     plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     plt.savefig('parameter_optimization_dashboard.png', dpi=300)
     print("Parameter optimization dashboard created and saved as 'parameter_optimization_dashboard.png'")
-
-
-# Helper functions for message generation
-def generate_numeric_messages(num_messages: int, min_val: int = 0, max_val: int = 1000000) -> List[int]:
-    """Generate a list of random numeric messages."""
-    return list(np.random.randint(min_val, max_val + 1, size=num_messages))
-
-
-def generate_string_messages(num_messages: int, length: int = 10, chars: str = None) -> List[str]:
-    """Generate a list of random string messages."""
-    if chars is None:
-        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    
-    messages = []
-    for _ in range(num_messages):
-        message = ''.join(np.random.choice(list(chars), size=length))
-        messages.append(message)
-    
-    return messages
