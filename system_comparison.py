@@ -16,6 +16,7 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 from typing import List, Dict, Any, Tuple
 import psutil
+import gc
 
 from framework import (
     create_id_system,
@@ -24,7 +25,7 @@ from framework import (
 )
 
 p = psutil.Process(os.getpid())
-p.cpu_affinity([1])  # Pin to CPU core 1 for performance consistency, especially important for systems with P and E cores as longer running tasks may be scheduled on E cores
+p.cpu_affinity([1])  # Pin to specific CPU core for performance consistency, especially important for systems with P and E cores as longer running tasks may be scheduled on E cores
 p.nice(psutil.HIGH_PRIORITY_CLASS)  # Set high priority for the process
 
 # Constants
@@ -33,39 +34,51 @@ ALPHABET_SIZES = [2, 3, 4, 8, 16]  # Different alphabets to test
 MAX_ENCODED_SIZE = 255  # message_length + nsym <= 255
 RELIABILITY_THRESHOLD = 0.95
 DEFAULT_TRIALS = 1000  # Monte Carlo trials
+VERBOSE = True  # Set to True for verbose output
 
 
-def measure_computation_time_from_reliability(system, messages: List[str], num_trials: int = DEFAULT_TRIALS) -> Tuple[float, float]:
+def measure_computation_time_from_reliability(system, messages: List[str], num_trials: int = DEFAULT_TRIALS, repeats: int = 3) -> Tuple[float, float]:
     """
-    Measure computation time by timing the reliability function.
+    Measure computation time by timing the reliability function, with reduced volatility.
     
     Args:
         system: The identification system
         messages: List of test messages
         num_trials: Number of trials for timing measurement (same as reliability measurement)
+        repeats: Number of times to repeat the timing for median filtering
         
     Returns:
         Tuple of (reliability, average_time_per_operation_ms)
     """
-    import gc
-    
-    # Disable garbage collection during timing for more accurate results
-    gc.disable()
-    
-    start_time = time.perf_counter()
-    reliability = IdMetrics.reliability(system, messages, num_trials)
-    end_time = time.perf_counter()
-    
-    gc.enable()
-    
-    # Calculate total time and average per operation
-    total_time_ms = (end_time - start_time) * 1000
-    
-    # Each trial in reliability() does one encoding and one decoding operation
-    # So total operations = 2 * num_trials
-    average_time_per_operation_ms = total_time_ms / (2 * num_trials)
-    
-    return reliability, average_time_per_operation_ms
+
+    # Warm up: run a few operations before timing
+    for _ in range(10):
+        IdMetrics.reliability(system, messages, 10)
+
+    times = []
+    reliabilities = []
+    for _ in range(repeats):
+        gc.disable()
+        start_time = time.perf_counter()
+        reliability = IdMetrics.reliability(system, messages, num_trials)
+        end_time = time.perf_counter()
+        gc.enable()
+        # gc.collect()
+        total_time_ms = (end_time - start_time) * 1000
+        avg_time_per_operation_ms = total_time_ms / (2 * num_trials)
+        times.append(avg_time_per_operation_ms)
+        reliabilities.append(reliability)
+
+    # Use median to reduce outlier influence
+    median_time = np.median(times)
+    median_reliability = np.median(reliabilities)
+
+    # Print median vs mean for comparison
+    if VERBOSE:
+        print(f"  Median Time per Operation: {median_time:.4f} ms (mean: {np.mean(times):.4f} ms)")
+
+
+    return median_reliability, median_time
 
 
 def explore_parameter_space(
@@ -101,6 +114,14 @@ def explore_parameter_space(
     # Initialize result storage for all curves
     all_results = {}
     all_configs = []
+
+    system_config = {
+        "message_length": 1,  # Placeholder, will be set in the loop
+        "nsym": 1,  # Placeholder, will be set in the loop
+        "code_length": code_length
+    }
+
+    system = create_id_system("paper_tagging", system_config)
     
     # Test each nsym fraction
     for curve_idx, nsym_fraction in enumerate(nsym_fractions):
@@ -123,20 +144,23 @@ def explore_parameter_space(
             # Skip if this would exceed the Reed-Solomon limit
             if message_length + nsym > MAX_ENCODED_SIZE:
                 continue
-                
-            print(f"Testing: msg_len={message_length}, nsym={nsym} ({nsym_fraction:.2f} × {max_nsym})")
+
+            if VERBOSE: 
+                print(f"Testing: msg_len={message_length}, nsym={nsym} ({nsym_fraction:.2f} × {max_nsym})")
             
             # Generate test messages
-            test_messages = utils.generate_test_messages(500, message_length, alphabet_size)
+            test_messages = utils.generate_test_messages(100, message_length, alphabet_size)
             
-            # Create system configuration
-            system_config = {
+            system.decoder.set_parameters({
                 "message_length": message_length,
                 "nsym": nsym,
                 "code_length": code_length
-            }
-            
-            system = create_id_system("paper_tagging", system_config)
+            })
+            system.encoder.set_parameters({
+                "message_length": message_length,
+                "nsym": nsym,
+                "code_length": code_length
+            })
             
             # Measure reliability and computation time together
             reliability, avg_time_per_operation = measure_computation_time_from_reliability(
@@ -149,10 +173,10 @@ def explore_parameter_space(
             # Calculate computational efficiency (code rate per unit time)
             computational_efficiency = effective_code_rate / avg_time_per_operation * 1000  # per second
             
-            print(f"  Reliability: {reliability:.4f}")
-            print(f"  Code Rate: {effective_code_rate:.4f}")
-            print(f"  Avg Time per Operation: {avg_time_per_operation:.4f} ms")
-            print(f"  Computational Efficiency: {computational_efficiency:.2f}")
+            if VERBOSE:
+                print(f"  Reliability: {reliability:.4f}")
+                print(f"  Code Rate: {effective_code_rate:.4f}")
+                print(f"  Computational Efficiency: {computational_efficiency:.2f}")
             
             # Store results for this curve
             message_lengths.append(message_length)
