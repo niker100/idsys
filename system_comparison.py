@@ -29,62 +29,56 @@ p.cpu_affinity([1])  # Pin to specific CPU core for performance consistency, esp
 p.nice(psutil.HIGH_PRIORITY_CLASS)  # Set high priority for the process
 
 # Constants
-OUTPUT_DIR = "output"
+OUTPUT_DIR = "output/system_comparison"
 ALPHABET_SIZES = [2, 3, 4, 8, 16]  # Different alphabets to test
+NSYM_CURVES = 4  # Number of different nsym curves to test
 MAX_ENCODED_SIZE = 255  # message_length + nsym <= 255
+MESSAGE_LENGTHS = [i for i in range(8, MAX_ENCODED_SIZE - 8, 8)]  # Message lengths to test
+
 RELIABILITY_THRESHOLD = 0.95
-DEFAULT_TRIALS = 1000  # Monte Carlo trials
+DEFAULT_TRIALS = 2000  # Monte Carlo trials
 VERBOSE = True  # Set to True for verbose output
 
 
-def measure_computation_time_from_reliability(system, messages: List[str], num_trials: int = DEFAULT_TRIALS, repeats: int = 3) -> Tuple[float, float]:
+
+def measure_computation_time_from_reliability(system, messages: List[str], num_trials: int = 100) -> Tuple[float, float]:
     """
-    Measure computation time by timing the reliability function, with reduced volatility.
+    Measure computation time by timing the reliability function.
     
     Args:
         system: The identification system
         messages: List of test messages
         num_trials: Number of trials for timing measurement (same as reliability measurement)
-        repeats: Number of times to repeat the timing for median filtering
         
     Returns:
         Tuple of (reliability, average_time_per_operation_ms)
     """
-
-    # Warm up: run a few operations before timing
-    for _ in range(10):
-        IdMetrics.reliability(system, messages, 10)
-
-    times = []
-    reliabilities = []
-    for _ in range(repeats):
-        gc.disable()
-        start_time = time.perf_counter()
-        reliability = IdMetrics.reliability(system, messages, num_trials)
-        end_time = time.perf_counter()
-        gc.enable()
-        # gc.collect()
-        total_time_ms = (end_time - start_time) * 1000
-        avg_time_per_operation_ms = total_time_ms / (2 * num_trials)
-        times.append(avg_time_per_operation_ms)
-        reliabilities.append(reliability)
-
-    # Use median to reduce outlier influence
-    median_time = np.median(times)
-    median_reliability = np.median(reliabilities)
-
-    # Print median vs mean for comparison
-    if VERBOSE:
-        print(f"  Median Time per Operation: {median_time:.4f} ms (mean: {np.mean(times):.4f} ms)")
-
-
-    return median_reliability, median_time
+    # import gc
+    
+    # Disable garbage collection during timing for more accurate results
+    # gc.disable()
+    
+    start_time = time.perf_counter()
+    reliability = IdMetrics.reliability(system, messages, num_trials)
+    end_time = time.perf_counter()
+    
+    # gc.enable()
+    # gc.collect()  # Force garbage collection after timing
+    
+    # Calculate total time and average per operation
+    total_time_ms = (end_time - start_time) * 1000
+    
+    # Each trial in reliability() does one encoding and one decoding operation
+    # So total operations = 2 * num_trials
+    average_time_per_operation_ms = total_time_ms / (2 * num_trials)
+    
+    return reliability, average_time_per_operation_ms
 
 
 def explore_parameter_space(
     alphabet_size: int,
     code_length: int = 1,
-    num_trials: int = DEFAULT_TRIALS,
+    num_trials: int = 100,
     num_nsym_curves: int = 4
 ) -> Dict[str, Any]:
     """
@@ -136,7 +130,7 @@ def explore_parameter_space(
         computational_efficiencies = []
         
         # Test different message lengths with this nsym fraction
-        for message_length in range(16, MAX_ENCODED_SIZE - 8, 8):
+        for message_length in MESSAGE_LENGTHS:
             # Calculate nsym for this fraction
             max_nsym = MAX_ENCODED_SIZE - message_length
             nsym = max(1, int(max_nsym * nsym_fraction))  # Ensure at least 1
@@ -176,6 +170,7 @@ def explore_parameter_space(
             if VERBOSE:
                 print(f"  Reliability: {reliability:.4f}")
                 print(f"  Code Rate: {effective_code_rate:.4f}")
+                print(f"  Avg Time per Operation: {avg_time_per_operation:.4f} ms")
                 print(f"  Computational Efficiency: {computational_efficiency:.2f}")
             
             # Store results for this curve
@@ -257,7 +252,6 @@ def explore_parameter_space(
         'most_efficient_config': most_efficient_config,
         'all_configs': all_configs
     }
-
 
 
 def plot_parameter_space_multi_curve(
@@ -468,6 +462,7 @@ def analyze_computation_tradeoffs(optimal_configs: Dict[int, Dict[str, Any]]) ->
         plt.savefig(os.path.join(OUTPUT_DIR, 'computation_tradeoff_analysis.png'), dpi=300)
         plt.close()
 
+
 def plot_optimal_comparison_with_timing(optimal_configs: Dict[int, Dict[str, Any]]) -> None:
     """
     Create a comparison plot including timing information.
@@ -538,6 +533,7 @@ def plot_optimal_comparison_with_timing(optimal_configs: Dict[int, Dict[str, Any
     plt.savefig(os.path.join(OUTPUT_DIR, 'optimal_configuration_with_timing.png'), dpi=300)
     plt.close()
 
+
 def main():
     """Main function demonstrating the system comparison and optimization."""
     start_time = time.time()
@@ -565,7 +561,7 @@ def main():
             alphabet_size=alphabet_size,
             code_length=1,
             num_trials=DEFAULT_TRIALS,
-            num_nsym_curves=4  # Test 4 different nsym curves
+            num_nsym_curves=NSYM_CURVES
         )
         
         optimal_configs[alphabet_size] = optimization_result

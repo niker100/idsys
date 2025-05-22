@@ -35,7 +35,7 @@ from framework import (
 
 # Constants for the analysis
 DEFAULT_TRIALS = 2000  # Number of Monte Carlo trials for each measurement
-OUTPUT_DIR = "output_revised"
+OUTPUT_DIR = "output/single_symbol_tag_analysis"
 
 def analyze_nsym_effect(
     nsym_values: List[int], 
