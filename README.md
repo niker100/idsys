@@ -1,6 +1,6 @@
 # Identification System Framework
 
-A comprehensive Python framework for creating, evaluating, and visualizing identification systems. This framework provides tools for implementing various identification coding schemes, measuring their performance, and analyzing the results through visualizations.
+A comprehensive Python framework for creating, evaluating, and visualizing identification systems. This framework provides tools for implementing various identification coding schemes, measuring their performance, and optimizing their computational efficiency through detailed parameter space analysis.
 
 ## Overview
 
@@ -11,7 +11,8 @@ This framework implements:
 1. Different identification system encoding schemes (e.g., Reed-Solomon-based tagging)
 2. Metrics for evaluating performance (reliability, error rates, collision probability, efficiency)
 3. Advanced visualization tools for analysis and parameter optimization
-4. Testing utilities and correctness validation
+4. Computational efficiency analysis to evaluate real-world performance
+5. Multi-parameter optimization across alphabet sizes and ECC configurations
 
 ## Structure
 
@@ -19,20 +20,26 @@ The framework consists of the following components:
 
 - `core.py`: Base classes and implementations for identification systems (e.g., PaperTaggingEncoder)
 - `metrics.py`: Functions for measuring system performance
-- `example_identification.py`: Comprehensive example script showing framework usage and generating all evaluation plots
+- `utils.py`: Utility functions for visualization and testing
+- `analyze_single_symbol_tag.py`: In-depth analysis of single-symbol tag performance
+- `system_comparison.py`: Comprehensive system optimization across parameters
 
 ## Usage
 
 ### Creating an Identification System
 
 ```python
-from framework import create_id_system, generate_string_messages
+from framework import create_id_system, utils
 
 # Create a Reed-Solomon-based identification system
-rs_system = create_id_system("paper_tagging", {"nsize": 32, "nsym": 8, "code_length": 8})
+rs_system = create_id_system("paper_tagging", {
+    "message_length": 64,
+    "nsym": 16,
+    "code_length": 1
+})
 
 # Generate test messages
-messages = generate_string_messages(count=10, length=10)
+messages = utils.generate_test_messages(count=100, length=64, alphabet_size=4)
 ```
 
 ### Evaluating System Performance
@@ -40,62 +47,57 @@ messages = generate_string_messages(count=10, length=10)
 ```python
 from framework import IdMetrics
 
-# Calculate reliability
-reliability = IdMetrics.reliability(rs_system, messages, num_trials=1000)
+# Calculate reliability and measure computation time
+reliability, avg_time = measure_computation_time_from_reliability(rs_system, messages, num_trials=1000)
 print(f"System reliability: {reliability:.4f}")
+print(f"Average operation time: {avg_time:.4f} ms")
 
 # Calculate error rates
 error_rates = IdMetrics.error_rates(rs_system, messages, num_trials=500)
 print(f"False positive rate: {error_rates['false_positive_rate']:.4f}")
 print(f"False negative rate: {error_rates['false_negative_rate']:.4f}")
 
-# Calculate worst-case collision probability
-collision_prob = IdMetrics.worst_case_collision_probability(
-    rs_system, messages, sample_size=10, num_trials=100
-)
-print(f"Worst-case collision probability: {collision_prob:.4f}")
-
 # Calculate efficiency metrics
 efficiency = IdMetrics.efficiency(rs_system)
-print(f"Code rate: {efficiency['code_rate']:.4f}")
-print(f"Encoding time: {efficiency['encoding_time_ms']:.4f} ms")
+print(f"Effective code rate: {efficiency['effective_code_rate']:.4f}")
+
+# Calculate computational efficiency
+computational_efficiency = efficiency['effective_code_rate'] / avg_time * 1000
+print(f"Computational efficiency: {computational_efficiency:.2f}")
 ```
 
+## Running Analysis Scripts
 
-## Running the Example Script
-
-The `example_identification.py` script demonstrates how to use the framework and will generate all evaluation plots:
+The framework includes specialized scripts for analyzing different aspects of identification systems:
 
 ```powershell
-python example_identification.py
+# Run single symbol tag analysis
+python analyze_single_symbol_tag.py
+
+# Run system comparison and optimization
+python system_comparison.py
 ```
 
-This will run a comprehensive analysis of different identification systems, including:
-- Comparison of multiple identification schemes
-- Parameter effect analysis
-- Parameter optimization dashboard
-- Creation of visualization dashboards
+These scripts generate comprehensive performance visualizations in the respective output directories.
 
-The example script will save visualization results as PNG files in the `output/` directory.
+## Key Visualization Examples
 
-## Output Evaluation Images
+| System Performance Overview | Parameter Optimization Analysis |
+|----------------------------|----------------------------------|
+| ![Single-Symbol Tag Performance Analysis](output/single_symbol_tag_analysis/summary_visualization.png) | ![Parameter Space Analysis](output/system_comparison/parameter_space_multi_curve_a8_c1.png) |
+| **Trade-off Analysis** | **Optimal Configuration Analysis** |
+| ![Computational Efficiency vs Code Rate](output/system_comparison/computation_tradeoff_analysis.png) | ![Optimal Configuration Analysis](output/system_comparison/optimal_configuration_with_timing.png) |
 
-The following images are generated by the example script and provide a visual summary of system performance and parameter effects:
-
-| System Comparison | Parameter Effects (nsym) | Parameter Effects (code_length) | Parameter Optimization Dashboard |
-|-------------------|-------------------------|----------------------------------|----------------------------------|
-| ![System Comparison](output/system_comparison.png) | ![Parameter Effects nsym](output/parameter_effects_nsym.png) | ![Parameter Effects code_length](output/parameter_effects_code_length.png) | ![Parameter Optimization Dashboard](output/parameter_optimization_coderate.png) |
-
-- **system_comparison.png**: Compares reliability, false positive rate, collision probability, and code rate for different system configurations.
-- **parameter_effects_nsym.png**: Shows how the number of ECC symbols (nsym) affects reliability and error rates.
-- **parameter_effects_code_length.png**: Shows how the code length parameter affects system performance.
-- **parameter_optimization_coderate.png**: Heatmaps and 3D plots for optimal parameter selection.
+- **Single-Symbol Tag Performance Analysis**: Shows the effects of error correction, message length, alphabet size, and message count on system performance.
+- **Parameter Space Analysis**: Explores multiple nsym curves to find optimal configurations that balance reliability and computational efficiency.
+- **Trade-off Analysis**: Compares max code rate and max efficiency configurations across alphabet sizes.
+- **Optimal Configuration Analysis**: Shows optimized parameters and computational metrics for different alphabet sizes.
 
 ## Components
 
 ### Encoders
 
-- **PaperTaggingEncoder**: Uses Reed-Solomon codes for robust identification
+- **PaperTaggingEncoder**: Uses Reed-Solomon codes for robust identification with configurable ECC symbols
 
 ### Decoders
 
@@ -107,14 +109,14 @@ The following images are generated by the example script and provide a visual su
 - **Error Rates**: False positive and false negative rates
 - **Collision Probability**: Likelihood of messages being confused
 - **Efficiency**: Code rate and encoding time
+- **Computational Efficiency**: Performance metric balancing code rate and computation time
 
 ### Visualization Tools
 
-- Individual metric plots
-- Parameter sweep visualizations
-- Comprehensive dashboards
-- Comparison between systems
-- Parameter optimization heatmaps
+- Parameter space exploration with multiple curves
+- Trade-off analysis between code rate and computation time
+- Computational efficiency analysis
+- Comprehensive performance dashboards
 
 ## References
 
