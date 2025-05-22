@@ -39,7 +39,7 @@ OUTPUT_DIR = "output/single_symbol_tag_analysis"
 
 def analyze_nsym_effect(
     nsym_values: List[int], 
-    msg_length: int = 64, 
+    msg_length: int = 32, 
     num_msgs: int = 100, 
     trials: int = DEFAULT_TRIALS
 ) -> dict:
@@ -332,58 +332,157 @@ def analyze_num_messages(
 
 def create_summary_visualization(results_dict: Dict[str, dict]):
     """
-    Create a summary visualization showing key findings from all analyses.
+    Create a comprehensive and visually appealing summary visualization showing 
+    key findings from all analyses using dual-axis plots where appropriate.
     
     Args:
         results_dict: Dictionary containing results from all analyses
     """
-    print("\nCreating summary visualization...")
+    print("\nCreating enhanced summary visualization...")
     
-    fig, axs = plt.subplots(2, 2, figsize=(15, 12))
-    fig.suptitle('Single-Symbol Tag Performance Analysis', fontsize=16)
+    fig = plt.figure(figsize=(16, 14))
+    gs = plt.GridSpec(2, 2, figure=fig)
     
-    # 1. ECC Symbols effect (top left)
+    fig.suptitle('Single-Symbol Tag Performance Analysis', fontsize=18, fontweight='bold')
+    
+    # 1. ECC Symbols effect (top left) - dual axis plot
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax1_twin = ax1.twinx()
+    
     nsym_results = results_dict['nsym']
-    axs[0, 0].plot(nsym_results['nsym_values'], nsym_results['reliabilities'], 'o-', label='Reliability')
-    axs[0, 0].plot(nsym_results['nsym_values'], nsym_results['effective_code_rates'], 's-', label='Code Rate')
-    axs[0, 0].set_xlabel('Number of ECC Symbols')
-    axs[0, 0].set_ylabel('Metric Value')
-    axs[0, 0].set_title('Effect of Error Correction')
-    axs[0, 0].legend()
-    axs[0, 0].grid(True, alpha=0.3)
     
-    # 2. Message Length effect (top right)
+    # Plot reliability and FP rate on primary axis
+    lns1 = ax1.plot(nsym_results['nsym_values'], nsym_results['reliabilities'], 'o-', 
+                    color='navy', linewidth=2, label='Reliability')
+    lns2 = ax1.plot(nsym_results['nsym_values'], nsym_results['fp_rates'], 's-', 
+                    color='crimson', linewidth=2, label='False Positive Rate')
+    
+    # Plot code rate on secondary axis
+    lns3 = ax1_twin.plot(nsym_results['nsym_values'], nsym_results['effective_code_rates'], '^-', 
+                         color='forestgreen', linewidth=2, label='Code Rate')
+    
+    # Configure axes
+    ax1.set_xlabel('Number of ECC Symbols (nsym)')
+    ax1.set_ylabel('Reliability / FP Rate')
+    ax1_twin.set_ylabel('Effective Code Rate')
+    ax1.set_ylim(0, 1.05)
+    ax1_twin.tick_params(axis='y', labelcolor='forestgreen')
+    
+    # Combine legends
+    lns = lns1 + lns2 + lns3
+    labs = [l.get_label() for l in lns]
+    ax1.legend(lns, labs, loc='best')
+    
+    ax1.set_title('Effect of Error Correction Capacity')
+    ax1.grid(True, alpha=0.3)
+    
+    # 2. Message Length effect (top right) - dual axis plot
+    ax2 = fig.add_subplot(gs[0, 1])
+    ax2_twin = ax2.twinx()
+    
     length_results = results_dict['message_length']
-    axs[0, 1].plot(length_results['lengths'], length_results['reliabilities'], 'o-', label='Reliability')
-    axs[0, 1].plot(length_results['lengths'], length_results['effective_code_rates'], 's-', label='Code Rate')
-    axs[0, 1].set_xlabel('Message Length (bytes)')
-    axs[0, 1].set_ylabel('Metric Value')
-    axs[0, 1].set_title('Effect of Message Length')
-    axs[0, 1].legend()
-    axs[0, 1].grid(True, alpha=0.3)
     
-    # 3. Alphabet Size effect (bottom left)
+    # Plot reliability and FP rate on primary axis
+    lns1 = ax2.plot(length_results['lengths'], length_results['reliabilities'], 'o-', 
+                    color='navy', linewidth=2, label='Reliability')
+    lns2 = ax2.plot(length_results['lengths'], length_results['fp_rates'], 's-', 
+                    color='crimson', linewidth=2, label='False Positive Rate')
+    
+    # Plot code rate on secondary axis
+    lns3 = ax2_twin.plot(length_results['lengths'], length_results['effective_code_rates'], '^-', 
+                         color='forestgreen', linewidth=2, label='Code Rate')
+    
+    # Configure axes
+    ax2.set_xlabel('Message Length (bytes)')
+    ax2.set_ylabel('Reliability / FP Rate')
+    ax2_twin.set_ylabel('Effective Code Rate')
+    ax2.set_ylim(0, 1.05)
+    ax2_twin.tick_params(axis='y', labelcolor='forestgreen')
+    
+    # Combine legends
+    lns = lns1 + lns2 + lns3
+    labs = [l.get_label() for l in lns]
+    ax2.legend(lns, labs, loc='best')
+    
+    ax2.set_title('Effect of Message Length')
+    ax2.grid(True, alpha=0.3)
+    
+    # 3. Alphabet Size effect (bottom left) - with entropy subplot
+    ax3 = fig.add_subplot(gs[1, 0])
+    ax3_twin = ax3.twinx()
+    
     alphabet_results = results_dict['alphabet']
-    axs[1, 0].plot(alphabet_results['sizes'], alphabet_results['reliabilities'], 'o-', label='Reliability')
-    axs[1, 0].set_xlabel('Alphabet Size')
-    axs[1, 0].set_ylabel('Reliability')
-    axs[1, 0].set_title('Effect of Alphabet Size')
-    axs[1, 0].set_xscale('log', base=2)
-    axs[1, 0].grid(True, alpha=0.3)
     
-    # 4. Number of Messages effect (bottom right)
+    # Plot reliability and FP rate
+    lns1 = ax3.plot(alphabet_results['sizes'], alphabet_results['reliabilities'], 'o-', 
+                    color='navy', linewidth=2, label='Reliability')
+    lns2 = ax3.plot(alphabet_results['sizes'], alphabet_results['fp_rates'], 's-', 
+                    color='crimson', linewidth=2, label='False Positive Rate')
+    
+    # Plot entropy as a line on secondary axis if available
+    if 'entropies' in alphabet_results:
+        lns3 = ax3_twin.plot(alphabet_results['sizes'], alphabet_results['entropies'], '^-', 
+                             color='purple', linewidth=2, label='Entropy (bits)')
+        ax3_twin.set_ylabel('Character Entropy (bits)')
+        ax3_twin.tick_params(axis='y', labelcolor='purple')
+    
+    # Configure primary axis
+    ax3.set_xlabel('Alphabet Size')
+    ax3.set_ylabel('Performance Metric')
+    ax3.set_xscale('log', base=2)
+    ax3.set_ylim(0, 1.05)
+    
+    # Combine legends
+    lns = lns1 + lns2
+    labs = [l.get_label() for l in lns]
+    if 'entropies' in alphabet_results:
+        lns += lns3
+        labs += [lns3[0].get_label()]
+    ax3.legend(lns, labs, loc='best')
+    
+    ax3.set_title('Effect of Alphabet Size')
+    ax3.grid(True, alpha=0.3)
+    
+    # 4. Number of Messages effect (bottom right) - with tag entropy
+    ax4 = fig.add_subplot(gs[1, 1])
+    ax4_twin = ax4.twinx()
+    
     count_results = results_dict['num_messages']
-    axs[1, 1].plot(count_results['counts'], count_results['reliabilities'], 'o-', label='Reliability')
-    axs[1, 1].plot(count_results['counts'], count_results['fp_rates'], 's-', label='FP Rate')
-    axs[1, 1].set_xlabel('Number of Messages')
-    axs[1, 1].set_ylabel('Metric Value')
-    axs[1, 1].set_title('Effect of Message Count')
-    axs[1, 1].legend()
-    axs[1, 1].grid(True, alpha=0.3)
     
-    plt.tight_layout()
-    plt.savefig(os.path.join(OUTPUT_DIR, 'summary_visualization.png'), dpi=300)
-    plt.close()
+    # Plot reliability and FP rate
+    lns1 = ax4.plot(count_results['counts'], count_results['reliabilities'], 'o-', 
+                    color='navy', linewidth=2, label='Reliability')
+    lns2 = ax4.plot(count_results['counts'], count_results['fp_rates'], 's-', 
+                    color='crimson', linewidth=2, label='False Positive Rate')
+    
+    # Extract and plot tag entropy if available
+    if count_results['tag_distributions']:
+        tag_entropies = [td['tag_entropy'] for td in count_results['tag_distributions']]
+        lns3 = ax4_twin.plot(count_results['counts'], tag_entropies, '^-', 
+                             color='purple', linewidth=2, label='Tag Entropy')
+        ax4_twin.set_ylabel('Tag Entropy (bits)')
+        ax4_twin.tick_params(axis='y', labelcolor='purple')
+        ax4_twin.set_ylim(0, max(tag_entropies) * 2)
+    
+    # Configure primary axis
+    ax4.set_xlabel('Number of Messages')
+    ax4.set_ylabel('Performance Metric')
+    ax4.set_ylim(0, 1.05)
+    
+    # Combine legends
+    lns = lns1 + lns2
+    labs = [l.get_label() for l in lns]
+    if count_results['tag_distributions']:
+        lns += lns3
+        labs += [lns3[0].get_label()]
+    ax4.legend(lns, labs, loc='best')
+    
+    ax4.set_title('Effect of Message Count')
+    ax4.grid(True, alpha=0.3)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust for the main title
+    plt.savefig(os.path.join(OUTPUT_DIR, 'summary_visualization.png'), dpi=300, bbox_inches='tight')
+    plt.close('all')
 
 def main():
     """
@@ -393,7 +492,7 @@ def main():
     utils.setup_visualization_style(OUTPUT_DIR)
     
     # Analysis parameters
-    nsym_values = [i for i in range(1, 33)]
+    nsym_values = [i for i in range(1, 201, 8)]
     message_lengths = [i for i in range(2, 257, 8)]
     alphabet_sizes = [2, 4, 8, 16, 26, 32, 52, 62, 80, 95, 110, 128, 160, 192, 224, 256]
     msg_counts = [i for i in range(100, 10000, 500)]
