@@ -24,7 +24,7 @@ from framework import (
 )
 
 p = psutil.Process(os.getpid())
-p.cpu_affinity([1])  # Pin to CPU core 1 for performance consistency
+p.cpu_affinity([1])  # Pin to CPU core 1 for performance consistency, especially important for systems with P and E cores as longer running tasks may be scheduled on E cores
 p.nice(psutil.HIGH_PRIORITY_CLASS)  # Set high priority for the process
 
 # Constants
@@ -33,71 +33,6 @@ ALPHABET_SIZES = [2, 3, 4, 8, 16]  # Different alphabets to test
 MAX_ENCODED_SIZE = 255  # message_length + nsym <= 255
 RELIABILITY_THRESHOLD = 0.95
 DEFAULT_TRIALS = 1000  # Monte Carlo trials
-
-
-def analyze_code_length_effect(
-    system_config: Dict[str, Any],
-    messages: List[str],
-    code_lengths: List[int] = None,
-    num_trials: int = DEFAULT_TRIALS
-) -> Dict[str, List[float]]:
-    """
-    Analyze the effect of different code lengths on system performance.
-    
-    Args:
-        system_config: Base configuration for the system
-        messages: Test messages to use
-        code_lengths: List of code lengths to test
-        num_trials: Number of Monte Carlo trials for each measurement
-        
-    Returns:
-        Dictionary with measurement results
-    """
-    if code_lengths is None:
-        code_lengths = list(range(1, 17))
-        
-    print(f"\nAnalyzing effect of code length (nsym={system_config['nsym']}, msg_len={system_config['message_length']})...")
-    
-    results = {
-        'code_lengths': code_lengths,
-        'reliabilities': [],
-        'fp_rates': [],
-        'effective_code_rates': []
-    }
-    
-    for code_length in code_lengths:
-        # Create a new system with the current code length
-        system_config['code_length'] = code_length
-        system = create_id_system("paper_tagging", system_config)
-        
-        # Measure performance metrics
-        reliability = IdMetrics.reliability(system, messages, num_trials)
-        error_rates = IdMetrics.error_rates(system, messages, num_trials)
-        efficiency = IdMetrics.efficiency(system)
-        
-        print(f"Code Length: {code_length}")
-        print(f"  Reliability: {reliability:.4f}")
-        print(f"  False Positive Rate: {error_rates['false_positive_rate']:.4f}")
-        print(f"  Effective Code Rate: {efficiency['effective_code_rate']:.4f}")
-        
-        results['reliabilities'].append(reliability)
-        results['fp_rates'].append(error_rates['false_positive_rate'])
-        results['effective_code_rates'].append(efficiency['effective_code_rate'])
-    
-    # Create visualization
-    utils.plot_performance_metrics_dual_scale(
-        metric_values={
-            'Reliability': results['reliabilities'],
-            'False Positive Rate': results['fp_rates'],
-            'Code Rate': results['effective_code_rates']
-        },
-        x_values=code_lengths,
-        x_label='Code Length (symbols)',
-        title=f'Effect of Code Length (nsym={system_config["nsym"]}, msg_len={system_config["message_length"]})',
-        filename=os.path.join(OUTPUT_DIR, f'code_length_effect_nsym{system_config["nsym"]}.png')
-    )
-    
-    return results
 
 
 def measure_computation_time_from_reliability(system, messages: List[str], num_trials: int = DEFAULT_TRIALS) -> Tuple[float, float]:
@@ -617,20 +552,7 @@ def main():
     
     # Step 3: Create summary visualizations
     print("\nStep 3: Creating summary visualizations...")
-    plot_optimal_comparison_with_timing(optimal_configs)
-    
-    # Step 4: Analyze code length effect for one configuration
-    if 2 in optimal_configs and optimal_configs[2]['optimal_config']:
-        print("\nStep 4: Analyzing code length effect for optimal configuration (alphabet size 2)...")
-        opt_config = optimal_configs[2]['optimal_config']
-        system_config = {
-            "message_length": opt_config["message_length"],
-            "nsym": opt_config["nsym"],
-            "code_length": 1  # Start with code_length=1
-        }
-        
-        messages = utils.generate_test_messages(500, system_config["message_length"], 2)
-        analyze_code_length_effect(system_config, messages, list(range(1, 17)))
+    plot_optimal_comparison_with_timing(optimal_configs)    
     
     # Print comprehensive summary
     print("\nSummary of Optimal Configurations (Across All nsym Curves):")
