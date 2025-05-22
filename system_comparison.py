@@ -36,7 +36,7 @@ MAX_ENCODED_SIZE = 255  # message_length + nsym <= 255
 MESSAGE_LENGTHS = [i for i in range(8, MAX_ENCODED_SIZE - 8, 8)]  # Message lengths to test
 
 RELIABILITY_THRESHOLD = 0.95
-DEFAULT_TRIALS = 2000  # Monte Carlo trials
+DEFAULT_TRIALS = 5000  # Monte Carlo trials
 VERBOSE = True  # Set to True for verbose output
 
 
