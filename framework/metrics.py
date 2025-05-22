@@ -11,7 +11,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Any, Optional, Union, Callable
 import time
 import math
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from .core import IdSystem, IdEncoder, IdDecoder
 
@@ -317,3 +317,148 @@ class IdMetrics:
         rate = identified_close_pairs / close_pairs_count if close_pairs_count > 0 else 0
         
         return rate
+
+
+class MessageAnalysisMetrics:
+    """Class for analyzing message characteristics like entropy."""
+    
+    @staticmethod
+    def calculate_message_entropy(messages: List[str]) -> Tuple[float, float]:
+        """
+        Calculate the entropy of a set of messages.
+        
+        Entropy measures the information content in the messages. Higher entropy
+        indicates more information density and less predictability.
+        
+        Args:
+            messages: List of messages to analyze
+            
+        Returns:
+            Tuple of (character entropy, message entropy)
+        """
+        all_chars = ''.join(messages)
+        char_counts = Counter(all_chars)
+        total_chars = len(all_chars)
+        
+        # Calculate entropy using Shannon's formula
+        char_entropy = -sum((count / total_chars) * math.log2(count / total_chars) 
+                          for count in char_counts.values())
+        
+        # Message entropy is character entropy times the average message length
+        avg_length = sum(len(m) for m in messages) / len(messages)
+        msg_entropy = char_entropy * avg_length
+        
+        return char_entropy, msg_entropy
+    
+    @staticmethod
+    def analyze_alphabet_usage(messages: List[str]) -> Dict[str, float]:
+        """
+        Analyze how the alphabet is used in the messages.
+        
+        Args:
+            messages: List of messages to analyze
+            
+        Returns:
+            Dictionary with alphabet usage statistics
+        """
+        all_chars = ''.join(messages)
+        char_counts = Counter(all_chars)
+        total_chars = len(all_chars)
+        
+        # Calculate character frequencies
+        frequencies = {char: count/total_chars for char, count in char_counts.items()}
+        
+        # Calculate additional statistics
+        unique_chars = len(char_counts)
+        avg_freq = 1.0 / unique_chars
+        freq_variance = sum((freq - avg_freq)**2 for freq in frequencies.values()) / unique_chars
+        
+        return {
+            'frequencies': frequencies,
+            'unique_chars': unique_chars,
+            'frequency_variance': freq_variance,
+            'most_common': char_counts.most_common(5)
+        }
+
+class TaggingMetrics:
+    """Metrics specific to tagging systems."""
+    
+    @staticmethod
+    def tag_rate(system: IdSystem) -> float:
+        """
+        Calculate the tag rate (tag length / message length).
+        
+        Args:
+            system: The tagging system to evaluate
+            
+        Returns:
+            Tag rate as a float
+        """
+        if not hasattr(system.encoder, 'parameters'):
+            return 0.0
+            
+        params = system.encoder.parameters
+        message_length = params.get('message_length', 0)
+        code_length = params.get('code_length', 0)
+        
+        return code_length / message_length if message_length > 0 else 0.0
+    
+    @staticmethod
+    def effective_tag_rate(system: IdSystem) -> float:
+        """
+        Calculate the effective tag rate considering Reed-Solomon overhead.
+        
+        Args:
+            system: The tagging system to evaluate
+            
+        Returns:
+            Effective tag rate as a float
+        """
+        if not hasattr(system.encoder, 'parameters'):
+            return 0.0
+            
+        params = system.encoder.parameters
+        message_length = params.get('message_length', 0)
+        code_length = params.get('code_length', 0)
+        nsym = params.get('nsym', 0)
+        
+        return (code_length - nsym) / message_length if message_length > 0 else 0.0
+    
+    @staticmethod
+    def analyze_tag_distribution(system: IdSystem, messages: List[str], num_samples: int = 1000) -> Dict[str, Any]:
+        """
+        Analyze the distribution of tags produced by the system.
+        
+        Args:
+            system: The tagging system to evaluate
+            messages: List of messages to analyze
+            num_samples: Number of tag samples to generate
+            
+        Returns:
+            Dictionary with tag distribution statistics
+        """
+        tags = []
+        positions = []
+        
+        # Sample tags from random messages
+        for _ in range(num_samples):
+            msg = np.random.choice(messages)
+            try:
+                pos, tag = system.send(msg)
+                tags.append(tuple(tag))
+                positions.append(pos)
+            except Exception:
+                continue
+                
+        # Analyze tag statistics
+        unique_tags = len(set(tags))
+        unique_positions = len(set(positions))
+        
+        return {
+            'unique_tags': unique_tags,
+            'unique_positions': unique_positions,
+            'tag_entropy': -sum((tags.count(t)/len(tags) * math.log2(tags.count(t)/len(tags))) 
+                               for t in set(tags)) if tags else 0,
+            'position_entropy': -sum((positions.count(p)/len(positions) * math.log2(positions.count(p)/len(positions))) 
+                                   for p in set(positions)) if positions else 0
+        }
