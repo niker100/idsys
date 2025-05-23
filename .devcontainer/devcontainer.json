@@ -24,7 +24,7 @@
 				"ms-python.vscode-pylance"
 			]
 		}
-	},
+	}
 	
 	// Add QEMU for ARM64 emulation
 	//"runArgs": ["--platform=linux/arm64"]
