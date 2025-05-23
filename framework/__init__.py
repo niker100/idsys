@@ -10,12 +10,13 @@ from .core import (
     IdEncoder, IdDecoder, IdSystem,
     create_id_system, generate_numeric_messages, generate_string_messages
 )
-from .metrics import IdMetrics
+from .metrics import IdMetrics, MessageAnalysisMetrics, TaggingMetrics
+from . import utils
 
 __all__ = [
     'IdEncoder', 'IdDecoder', 'IdSystem',
-    'HashTaggingEncoder', 'BitwiseCompareDecoder',
-    'RandomProjectionEncoder', 'HammingDistanceDecoder',
+    'PaperTaggingEncoder', 'PaperTaggingDecoder',
     'create_id_system', 'generate_numeric_messages', 'generate_string_messages',
-    'IdMetrics', 'IdVisualizer', 'InteractiveIdVisualizer'
+    'IdMetrics', 'MessageAnalysisMetrics', 'TaggingMetrics',
+    'utils'
 ]

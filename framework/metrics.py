@@ -11,7 +11,7 @@ import numpy as np
 from typing import Dict, List, Tuple, Any, Optional, Union, Callable
 import time
 import math
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from .core import IdSystem, IdEncoder, IdDecoder
 
@@ -132,60 +132,57 @@ class IdMetrics:
         }
     
     @staticmethod
-    def worst_case_collision_probability(system: IdSystem, message_set: List[Any], 
-                                         sample_size: Optional[int] = None, 
-                                         num_trials: int = 100) -> float:
+    def worst_case_collision_probability(system: IdSystem, message_set: List[Any],
+                                        sample_size: Optional[int] = None,
+                                        num_trials: int = 1000) -> float:
         """
-        Estimate the worst-case probability of collision.
-        
-        For any message in the set, find the highest probability of another
-        message being incorrectly identified as matching.
-        
-        Args:
-            system: The identification system to evaluate
-            message_set: The set of possible messages
-            sample_size: Number of messages to sample (None = use all messages)
-            num_trials: Number of trials for each message pair
-            
-        Returns:
-            float: The worst-case collision probability (0-1, lower is better)
+        Estimate the worst-case probability of tag collision (i.e., two different messages
+        produce the same tag at the same random position pi).
+
+        For a strong RS tagging code and a large message space, this should be extremely low;
+        if the tag length is L bytes, the theoretical random collision probability is about 1/256^L.
+
+        Returns the maximum observed collision rate over all sampled messages as an upper bound.
+
+        NOTE: For well-designed RS tag codes, this will often be zero in practice.
         """
         if sample_size is None or sample_size > len(message_set):
-            sample_size = len(message_set)
-        
-        # Sample messages to test
+            sample_size = min(len(message_set), 100)
+
         sampled_indices = np.random.choice(len(message_set), size=sample_size, replace=False)
         sampled_messages = [message_set[i] for i in sampled_indices]
-        
-        worst_collision_prob = 0
-        
+        collision_probabilities = []
+
         for sender_message in sampled_messages:
-            # Encode sender message
-            codeword = system.send(sender_message)
-            
-            # Compare with all other messages
-            collisions = 0
-            for receiver_message in message_set:
-                if receiver_message == sender_message:
-                    continue
-                
-                # Check if the receiver would identify this message as matching
-                if system.receive(codeword, receiver_message):
-                    collisions += 1
-            
-            collision_prob = collisions / (len(message_set) - 1) if len(message_set) > 1 else 0
-            worst_collision_prob = max(worst_collision_prob, collision_prob)
-        
-        return worst_collision_prob
+            collisions_per_trial = []
+            for _ in range(num_trials):
+                codeword = system.send(sender_message)
+                pi, encoded_tag = codeword
+
+                # Sample a subset of receiver messages for larger spaces
+                max_test = min(100, len(message_set)-1)
+                test_indices = np.random.choice([i for i in range(len(message_set)) if message_set[i] != sender_message], size=max_test, replace=False)
+                test_messages = [message_set[i] for i in test_indices]
+
+                collisions = 0
+                for receiver_message in test_messages:
+                    try:
+                        recomputed_tag = system.decoder._recompute_tag(receiver_message, pi)
+                        if np.array_equal(encoded_tag, recomputed_tag):
+                            collisions += 1
+                    except Exception:
+                        continue
+                collision_rate = collisions / len(test_messages) if test_messages else 0
+                collisions_per_trial.append(collision_rate)
+            # Take 95th percentile for conservative bound
+            collision_probabilities.append(np.percentile(collisions_per_trial, 95))
+
+        return max(collision_probabilities) if collision_probabilities else 0
     
     @staticmethod
     def efficiency(system: IdSystem) -> Dict[str, float]:
         """
         Calculate efficiency metrics for the identification system.
-        
-        This measures:
-        - Code rate: The ratio of message size to codeword size
-        - Encoding time: The time taken to encode a message
         
         Args:
             system: The identification system to evaluate
@@ -193,33 +190,47 @@ class IdMetrics:
         Returns:
             Dict with efficiency metrics
         """
-        # For measuring code rate, we need to know message and codeword sizes
-        # Let's use a simple numeric message as a test case
-        test_message = 12345
-        
-        # Encode and measure codeword size
-        start_time = time.time()
-        codeword = system.send(test_message)
-        end_time = time.time()
-        
-        # Message size in bits (estimated)
-        message_size_bits = math.ceil(math.log2(test_message + 1)) if test_message > 0 else 1
-        
-        # Codeword size in bits
-        if isinstance(codeword, np.ndarray):
-            codeword_bits = codeword.size * math.ceil(math.log2(np.max(codeword) + 1)) if codeword.size > 0 else 1
+        # For RS-based systems, get exact code rate from parameters
+        if hasattr(system.encoder, 'parameters') and 'message_length' in system.encoder.parameters and 'nsym' in system.encoder.parameters:
+            message_length = system.encoder.parameters["message_length"]
+            nsym = system.encoder.parameters["nsym"]            
+            code_length = system.encoder.parameters["code_length"]
+            # Exact code rate calculation for Reed-Solomon
+            code_rate = (message_length + nsym) / code_length
+            effective_code_rate = (message_length) / code_length           
         else:
-            # If not a numpy array, estimate size by serializing
-            codeword_bits = len(str(codeword)) * 8  # Rough estimate
+            # Fallback to approximation if system doesn't expose RS parameters
+            test_message = "12345"
+            start_time = time.time()
+            codeword = system.send(test_message)
+            end_time = time.time()
+            
+            # Message size in bits (estimated)
+            message_size_bits = math.ceil(math.log2(test_message + 1)) if test_message > 0 else 1
+            
+            # Codeword size in bits
+            if isinstance(codeword, tuple) and len(codeword) == 2:
+                _, tag = codeword
+                if isinstance(tag, np.ndarray):
+                    codeword_bits = tag.size * 8  # Assuming 8 bits per byte
+                else:
+                    codeword_bits = len(str(tag)) * 8  # Rough estimate
+            elif isinstance(codeword, np.ndarray):
+                codeword_bits = codeword.size * 8
+            else:
+                codeword_bits = len(str(codeword)) * 8
+            
+            code_rate = message_size_bits / codeword_bits if codeword_bits > 0 else 0
+            effective_code_rate = code_rate
         
-        # Calculate code rate (message bits / codeword bits)
-        code_rate = message_size_bits / codeword_bits if codeword_bits > 0 else 0
-        
-        # Encoding time
-        encoding_time = end_time - start_time
+        # Encoding time measurement
+        start_time = time.time()
+        system.send("12345")  # Use a consistent test message
+        encoding_time = time.time() - start_time
         
         return {
             "code_rate": code_rate,
+            "effective_code_rate": effective_code_rate,
             "encoding_time_ms": encoding_time * 1000
         }
     
@@ -306,3 +317,148 @@ class IdMetrics:
         rate = identified_close_pairs / close_pairs_count if close_pairs_count > 0 else 0
         
         return rate
+
+
+class MessageAnalysisMetrics:
+    """Class for analyzing message characteristics like entropy."""
+    
+    @staticmethod
+    def calculate_message_entropy(messages: List[str]) -> Tuple[float, float]:
+        """
+        Calculate the entropy of a set of messages.
+        
+        Entropy measures the information content in the messages. Higher entropy
+        indicates more information density and less predictability.
+        
+        Args:
+            messages: List of messages to analyze
+            
+        Returns:
+            Tuple of (character entropy, message entropy)
+        """
+        all_chars = ''.join(messages)
+        char_counts = Counter(all_chars)
+        total_chars = len(all_chars)
+        
+        # Calculate entropy using Shannon's formula
+        char_entropy = -sum((count / total_chars) * math.log2(count / total_chars) 
+                          for count in char_counts.values())
+        
+        # Message entropy is character entropy times the average message length
+        avg_length = sum(len(m) for m in messages) / len(messages)
+        msg_entropy = char_entropy * avg_length
+        
+        return char_entropy, msg_entropy
+    
+    @staticmethod
+    def analyze_alphabet_usage(messages: List[str]) -> Dict[str, float]:
+        """
+        Analyze how the alphabet is used in the messages.
+        
+        Args:
+            messages: List of messages to analyze
+            
+        Returns:
+            Dictionary with alphabet usage statistics
+        """
+        all_chars = ''.join(messages)
+        char_counts = Counter(all_chars)
+        total_chars = len(all_chars)
+        
+        # Calculate character frequencies
+        frequencies = {char: count/total_chars for char, count in char_counts.items()}
+        
+        # Calculate additional statistics
+        unique_chars = len(char_counts)
+        avg_freq = 1.0 / unique_chars
+        freq_variance = sum((freq - avg_freq)**2 for freq in frequencies.values()) / unique_chars
+        
+        return {
+            'frequencies': frequencies,
+            'unique_chars': unique_chars,
+            'frequency_variance': freq_variance,
+            'most_common': char_counts.most_common(5)
+        }
+
+class TaggingMetrics:
+    """Metrics specific to tagging systems."""
+    
+    @staticmethod
+    def tag_rate(system: IdSystem) -> float:
+        """
+        Calculate the tag rate (tag length / message length).
+        
+        Args:
+            system: The tagging system to evaluate
+            
+        Returns:
+            Tag rate as a float
+        """
+        if not hasattr(system.encoder, 'parameters'):
+            return 0.0
+            
+        params = system.encoder.parameters
+        message_length = params.get('message_length', 0)
+        code_length = params.get('code_length', 0)
+        
+        return code_length / message_length if message_length > 0 else 0.0
+    
+    @staticmethod
+    def effective_tag_rate(system: IdSystem) -> float:
+        """
+        Calculate the effective tag rate considering Reed-Solomon overhead.
+        
+        Args:
+            system: The tagging system to evaluate
+            
+        Returns:
+            Effective tag rate as a float
+        """
+        if not hasattr(system.encoder, 'parameters'):
+            return 0.0
+            
+        params = system.encoder.parameters
+        message_length = params.get('message_length', 0)
+        code_length = params.get('code_length', 0)
+        nsym = params.get('nsym', 0)
+        
+        return (code_length - nsym) / message_length if message_length > 0 else 0.0
+    
+    @staticmethod
+    def analyze_tag_distribution(system: IdSystem, messages: List[str], num_samples: int = 1000) -> Dict[str, Any]:
+        """
+        Analyze the distribution of tags produced by the system.
+        
+        Args:
+            system: The tagging system to evaluate
+            messages: List of messages to analyze
+            num_samples: Number of tag samples to generate
+            
+        Returns:
+            Dictionary with tag distribution statistics
+        """
+        tags = []
+        positions = []
+        
+        # Sample tags from random messages
+        for _ in range(num_samples):
+            msg = np.random.choice(messages)
+            try:
+                pos, tag = system.send(msg)
+                tags.append(tuple(tag))
+                positions.append(pos)
+            except Exception:
+                continue
+                
+        # Analyze tag statistics
+        unique_tags = len(set(tags))
+        unique_positions = len(set(positions))
+        
+        return {
+            'unique_tags': unique_tags,
+            'unique_positions': unique_positions,
+            'tag_entropy': -sum((tags.count(t)/len(tags) * math.log2(tags.count(t)/len(tags))) 
+                               for t in set(tags)) if tags else 0,
+            'position_entropy': -sum((positions.count(p)/len(positions) * math.log2(positions.count(p)/len(positions))) 
+                                   for p in set(positions)) if positions else 0
+        }
