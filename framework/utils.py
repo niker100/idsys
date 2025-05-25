@@ -1,14 +1,15 @@
-import numpy as np
+"""
+Utility functions for evaluating identification systems.
+"""
+
 from typing import List, Dict, Any
 from .core import IdSystem, generate_test_messages
 from .metrics import IdMetrics
 
 
-# Additional utility functions for specific use cases
 def evaluate_system_with_generated_messages(
     system: IdSystem,
     vec_len: int,
-    gf_exp: int,
     num_messages: int = 100,
     **kwargs
 ) -> Dict[str, float]:
@@ -18,44 +19,44 @@ def evaluate_system_with_generated_messages(
     Args:
         system: The identification system to evaluate
         vec_len: Vector length for message generation
-        gf_exp: Galois field exponent for message generation
         num_messages: Number of messages to generate
         **kwargs: Additional arguments passed to evaluate_system
         
     Returns:
-        Comprehensive metrics dictionary
+        metrics dictionary
     """
+    gf_exp = system.encoder.parameters.get('gf_exp')
+
+    if gf_exp is None:
+        raise ValueError("System encoder must have 'gf_exp' parameter set.")
+    
     message_set = generate_test_messages(vec_len, gf_exp, num_messages)
     return IdMetrics.evaluate_system(system, message_set, **kwargs)
 
 
 def batch_evaluate_parameters(
-    system_type: str,
+    system: IdSystem,
     parameter_grid: Dict[str, List[Any]],
     vec_len: int,
-    gf_exp: int,
-    num_messages: int = 50,
+    num_messages: int = 100,
     **eval_kwargs
 ) -> Dict[str, Dict[str, float]]:
     """
     Evaluate a system type across multiple parameter combinations.
     
     Args:
-        system_type: Type of system ("RSID", "RS2ID", etc.)
+        system: The identification system to evaluate
         parameter_grid: Dictionary of parameter names to lists of values
         vec_len: Vector length for message generation
-        gf_exp: Galois field exponent
         num_messages: Number of test messages
         **eval_kwargs: Additional arguments for evaluation
         
     Returns:
-        Dictionary mapping parameter combination strings to metrics
+        Dictionary mapping parameter combination strings to metrics dictionaries
     """
-    from .core import create_id_system
     from itertools import product
     
     results = {}
-    message_set = generate_test_messages(vec_len, gf_exp, num_messages)
     
     # Generate all parameter combinations
     param_names = list(parameter_grid.keys())
@@ -63,15 +64,23 @@ def batch_evaluate_parameters(
     
     for combination in product(*param_values):
         params = dict(zip(param_names, combination))
-        param_str = "_".join(f"{k}={v}" for k, v in params.items())
+        param_str = "_".join(f"{k}={v}" for k, v in params.items())    
+
+        # Use the gf_exp from params, if not provided, fallback to system's encoder parameters
+        current_gf_exp = params.get('gf_exp', system.encoder.parameters.get('gf_exp'))
+        if current_gf_exp is None:
+            raise ValueError(f"Parameter 'gf_exp' is neither in the provided parameters nor in the system's encoder parameters.")
         
-        try:
-            system = create_id_system(system_type, params)
-            results[param_str] = IdMetrics.evaluate_system(
-                system, message_set, **eval_kwargs
-            )
-        except Exception as e:
-            print(f"Failed to evaluate {param_str}: {e}")
-            continue
-    
+        # Generate messages with the correct gf_exp for this parameter combination
+        message_set = generate_test_messages(vec_len, current_gf_exp, num_messages)
+        
+        # Update system parameters
+        system.encoder.parameters.update(params)
+        system.decoder.parameters.update(params)
+
+
+        results[param_str] = IdMetrics.evaluate_system(
+            system, message_set, **eval_kwargs
+        )
+
     return results
