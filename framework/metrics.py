@@ -10,10 +10,10 @@ efficiency, error rates, etc.
 import numpy as np
 import time
 import math
-from typing import Dict, List, Tuple, Any, Optional, Union, Callable
-from collections import Counter, defaultdict
+from typing import Dict, List, Tuple
+from collections import Counter
 
-from .core import IdSystem, IdEncoder, IdDecoder, generate_test_messages
+from core import IdSystem
 
 
 class IdMetrics:
@@ -27,7 +27,7 @@ class IdMetrics:
         timing_iterations: int = 100
     ) -> Dict[str, float]:
         """
-        Comprehensive evaluation of an identification system.
+        Complete evaluation of an identification system.
         
         Args:
             system: The identification system to evaluate
@@ -107,7 +107,7 @@ class IdMetrics:
     
     @staticmethod
     def _calculate_code_rate(system_type: str, avg_message_length: float, gf_exp: int) -> float:
-        """Calculate effective code rate based on system type."""
+        """Calculate effective code rate defined as the ratio of message bits to tag/output bits."""
         if system_type in ['SHA1ID']:
             # SHA1 produces 160-bit tags regardless of message length
             return avg_message_length * 8 / 160.0
@@ -124,53 +124,38 @@ class IdMetrics:
         message_set: List[List[int]], 
         num_trials: int
     ) -> Tuple[float, float]:
-        """Calculate reliability and false positive rate."""
-        correct_count = 0
+        """Calculate reliability (correct identification rate) and false positive rate."""
+        correct = 0
         false_positives = 0
-        total_negative_trials = 0
-        
+        negatives = 0
+        n = len(message_set)
+        if n < 2:
+            raise ValueError("Message set must contain at least two distinct messages for negative identification scenarios.")
+
         for _ in range(num_trials):
-            # Choose random sender message
-            sender_idx = np.random.randint(0, len(message_set))
-            sender_message = message_set[sender_idx]
-            
-            # Choose whether this is a true or false identification scenario
-            is_true_id = np.random.choice([True, False])
-            
-            try:
-                codeword = system.send(sender_message)
-                
-                if is_true_id:
-                    # Receiver has the same message
-                    receiver_message = sender_message
-                    expected_result = True
-                    result = system.receive(codeword, receiver_message)
-                    if result == expected_result:
-                        correct_count += 1
+            # Choose random message and identification scenario
+            idx = np.random.randint(0, n)
+            msg = message_set[idx]
+            is_true = np.random.choice([True, False])
+
+            codeword = system.send(msg)
+            if is_true:
+                # Positive identification scenario
+                if system.receive(codeword, msg):
+                    correct += 1
+            else:
+                # Pick a different message than the one sent for negative identification scenario
+                other_idx = (idx + np.random.randint(1, n)) % n
+
+                negatives += 1
+                if system.receive(codeword, message_set[other_idx]):
+                    false_positives += 1
                 else:
-                    # Receiver has a different message
-                    receiver_idx = np.random.randint(0, len(message_set))
-                    while receiver_idx == sender_idx and len(message_set) > 1:
-                        receiver_idx = np.random.randint(0, len(message_set))
-                    receiver_message = message_set[receiver_idx]
-                    
-                    result = system.receive(codeword, receiver_message)
-                    total_negative_trials += 1
-                    
-                    if result:  # Should be False but got True
-                        false_positives += 1
-                    else:  # Correctly rejected
-                        correct_count += 1
-                        
-            except Exception:
-                # Exception counts as incorrect for reliability, correct rejection for FP
-                if not is_true_id:
-                    total_negative_trials += 1
-                    correct_count += 1  # Exception = correct rejection
-        
-        reliability = correct_count / num_trials
-        fp_rate = false_positives / max(total_negative_trials, 1)
-        
+                    correct += 1
+
+
+        reliability = correct / num_trials
+        fp_rate = false_positives / max(negatives, 1)
         return reliability, fp_rate
     
     @staticmethod
@@ -181,17 +166,17 @@ class IdMetrics:
     ) -> Dict[str, float]:
         """Calculate execution time metrics."""
         times = []
+        n = len(message_set)
         
         for _ in range(iterations):
             # Choose random message
-            message = message_set[np.random.randint(0, len(message_set))]
+            message = message_set[np.random.randint(0, n)]
             
             # Time the encoding operation
             start_time = time.perf_counter()
-            try:
-                codeword = system.send(message)
-            except Exception:
-                continue  # Skip failed encodings
+
+            system.send(message)
+
             end_time = time.perf_counter()
             
             execution_time_ms = (end_time - start_time) * 1000
@@ -242,11 +227,8 @@ class IdMetrics:
         tags = []
         
         for message in sample_messages:
-            try:
-                tag = system.send(message)
-                tags.append(tag)
-            except Exception:
-                continue
+            tag = system.send(message)
+            tags.append(tag)
         
         if not tags:
             return {
@@ -270,17 +252,14 @@ class IdMetrics:
         tag_uniqueness = unique_tags / total_tags
         
         # Calculate distribution uniformity (how close to uniform distribution)
-        expected_prob = 1.0 / unique_tags
-        uniformity = 0.0
-        for count in tag_counts.values():
-            actual_prob = count / total_tags
-            uniformity += (actual_prob - expected_prob) ** 2
-        uniformity = 1.0 - math.sqrt(uniformity / unique_tags)  # Convert to 0-1 scale
+        # This is the relative entropy compared to a uniform distribution
+        # D(p_X || p_U) = H(X) - log2(|χ|) where X is the random variable, |χ| the size of the alphabet 
+        uniformity = tag_entropy - math.log2(unique_tags) if unique_tags > 0 else 0.0
         
         return {
             'tag_entropy': tag_entropy,
             'tag_uniqueness': tag_uniqueness,
-            'tag_distribution_uniformity': max(0.0, uniformity)
+            'tag_distribution_uniformity': uniformity
         }
     
     @staticmethod
