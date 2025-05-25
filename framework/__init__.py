@@ -14,10 +14,7 @@ from .core import (
     SHA1IDEncoder, SHA1IDDecoder,
     SHA256IDEncoder, SHA256IDDecoder,
     create_id_system, 
-    generate_string_sequence,
     generate_test_messages,
-    read_file_data,
-    read_text_sequence,
     _get_idcodes_instance
 )
 

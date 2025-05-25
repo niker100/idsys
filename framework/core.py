@@ -5,10 +5,7 @@ Core module for identification systems using the idcodes library.
 This module provides the fundamental classes and functions for
 implementing and evaluating identification systems with multiple coding schemes.
 """
-import numpy as np
-import random
-import string
-from typing import List, Tuple, Any, Optional, Dict, Union
+from typing import List, Any, Optional, Dict
 from idcodes.idcodes import IDCODES_U8, IDCODES_U16, IDCODES_U32, IDCODES_U64
 
 
@@ -297,7 +294,7 @@ class SHA256IDDecoder(IdDecoder):
 
 def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, Any]] = None) -> IdSystem:
     """
-    Create an identification system with the specified encoder type.
+    Create an identification system with the specified encoder/decoder type.
     
     Args:
         system_type: One of "RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"
@@ -305,7 +302,7 @@ def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, A
     """
     parameters = parameters or {}
     
-    encoder_classes = {
+    systems = {
         "RSID": (RSIDEncoder, RSIDDecoder),
         "RS2ID": (RS2IDEncoder, RS2IDDecoder),
         "RMID": (RMIDEncoder, RMIDDecoder),
@@ -313,29 +310,15 @@ def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, A
         "SHA256ID": (SHA256IDEncoder, SHA256IDDecoder)
     }
     
-    if system_type not in encoder_classes:
+    if system_type not in systems:
         raise ValueError(f"Unsupported system type: {system_type}. "
-                        f"Supported types: {list(encoder_classes.keys())}")
+                        f"Supported types: {list(systems.keys())}")
     
-    encoder_class, decoder_class = encoder_classes[system_type]
+    encoder_class, decoder_class = systems[system_type]
     encoder = encoder_class(parameters)
     decoder = decoder_class(parameters)
     
     return IdSystem(encoder, decoder)
-
-
-def generate_string_sequence(Id, vec_len: int) -> List[int]:
-    """
-    Generate string sequence using idcodes library method (like Pybenchmark).
-    
-    Args:
-        Id: IDCODES instance (U8, U16, U32, or U64)
-        vec_len: Vector length
-        
-    Returns:
-        List of integers representing the message
-    """
-    return Id.generate_string_sequence(vec_len)
 
 
 def generate_test_messages(vec_len: int, gf_exp: int, count: int = 1) -> List[List[int]]:
@@ -365,36 +348,7 @@ def generate_test_messages(vec_len: int, gf_exp: int, count: int = 1) -> List[Li
     
     messages = []
     for _ in range(count):
-        message = generate_string_sequence(Id, vec_len_)
+        message = Id.generate_string_sequence(vec_len)
         messages.append(message)
     
     return messages
-
-
-def read_file_data(filepath: str, gf_exp: int) -> List[int]:
-    """
-    Read file data using idcodes library method (like Pybenchmark).
-    
-    Args:
-        filepath: Path to input file
-        gf_exp: Galois field exponent
-        
-    Returns:
-        List of integers representing the file content
-    """
-    Id = _get_idcodes_instance(gf_exp)
-    return Id.read_file(filepath, gf_exp)
-
-
-def read_text_sequence(filepath: str) -> List[int]:
-    """
-    Read text file as sequence using idcodes library method (like Pybenchmark).
-    
-    Args:
-        filepath: Path to text file
-        
-    Returns:
-        List of integers representing the text content
-    """
-    Id = _get_idcodes_instance(8)  # Default to U8 for text
-    return Id.read_inputfile_sequence(filepath, False)
