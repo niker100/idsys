@@ -26,11 +26,11 @@ import os
 from typing import List, Dict, Any, Optional
 
 from framework import (
-    create_id_system, 
+    RSIDEncoder, RSIDDecoder,
     IdMetrics, 
     MessageAnalysisMetrics,
     TaggingMetrics,
-    utils
+    utils_old
 )
 
 # Constants for the analysis
@@ -55,7 +55,7 @@ def analyze_nsym_effect(
         'effective_code_rates': []
     }
     
-    messages = utils.generate_test_messages(num_msgs, msg_length, 4)
+    messages = utils_old.generate_test_messages(num_msgs, msg_length, 4)
     
     for nsym in nsym_values:
         print(f"Testing nsym = {nsym}")
@@ -81,7 +81,7 @@ def analyze_nsym_effect(
         results['effective_code_rates'].append(efficiency['effective_code_rate'])
     
     # Use the new dual-scale plotting function
-    utils.plot_performance_metrics_dual_scale(
+    utils_old.plot_performance_metrics_dual_scale(
         metric_values={
             'Reliability': results['reliabilities'],
             'False Positive Rate': results['fp_rates'],
@@ -125,7 +125,7 @@ def analyze_message_length(
     
     for length in lengths:
         print(f"Testing message length: {length}")
-        messages = utils.generate_test_messages(num_msgs, length, 4)
+        messages = utils_old.generate_test_messages(num_msgs, length, 4)
         
         # Create system with single-symbol tag
         system = create_id_system("paper_tagging", {
@@ -153,7 +153,7 @@ def analyze_message_length(
         results['entropies'].append(msg_entropy)
     
     # Create visualization
-    utils.plot_performance_metrics_dual_scale(
+    utils_old.plot_performance_metrics_dual_scale(
         metric_values={
             'Reliability': results['reliabilities'],
             'False Positive Rate': results['fp_rates'],
@@ -214,7 +214,7 @@ def analyze_alphabet_size(
     
     for size in sizes:
         print(f"Testing alphabet size: {size}")
-        messages = utils.generate_test_messages(num_msgs, msg_length, size)
+        messages = utils_old.generate_test_messages(num_msgs, msg_length, size)
         
         # Calculate entropy to understand information content
         char_entropy, msg_entropy = MessageAnalysisMetrics.calculate_message_entropy(messages)
@@ -236,7 +236,7 @@ def analyze_alphabet_size(
         results['entropies'].append(char_entropy)
     
     # Create visualization
-    utils.plot_performance_metrics(
+    utils_old.plot_performance_metrics(
         metric_values={
             'Reliability': results['reliabilities'],
             'False Positive Rate': results['fp_rates']
@@ -298,7 +298,7 @@ def analyze_num_messages(
     
     for count in counts:
         print(f"Testing {count} messages...")
-        messages = utils.generate_test_messages(count, msg_length, 4)
+        messages = utils_old.generate_test_messages(count, msg_length, 4)
         
         # Measure performance metrics
         reliability = IdMetrics.reliability(system, messages, trials)
@@ -317,7 +317,7 @@ def analyze_num_messages(
         results['tag_distributions'].append(tag_stats)
     
     # Create visualization
-    utils.plot_performance_metrics(
+    utils_old.plot_performance_metrics(
         metric_values={
             'Reliability': results['reliabilities'],
             'False Positive Rate': results['fp_rates']
@@ -489,7 +489,7 @@ def main():
     Main function to run all analyses and generate comprehensive insights.
     """
     start_time = time.time()
-    utils.setup_visualization_style(OUTPUT_DIR)
+    utils_old.setup_visualization_style(OUTPUT_DIR)
     
     # Analysis parameters
     nsym_values = [i for i in range(1, 201, 8)]

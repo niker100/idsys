@@ -21,7 +21,7 @@ import gc
 from framework import (
     create_id_system,
     IdMetrics,
-    utils
+    utils_old
 )
 
 p = psutil.Process(os.getpid())
@@ -143,7 +143,7 @@ def explore_parameter_space(
                 print(f"Testing: msg_len={message_length}, nsym={nsym} ({nsym_fraction:.2f} × {max_nsym})")
             
             # Generate test messages
-            test_messages = utils.generate_test_messages(100, message_length, alphabet_size)
+            test_messages = utils_old.generate_test_messages(100, message_length, alphabet_size)
             
             system.decoder.set_parameters({
                 "message_length": message_length,
@@ -544,7 +544,7 @@ def main():
     
     # Setup output directory and visualization style
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    utils.setup_visualization_style(OUTPUT_DIR)
+    utils_old.setup_visualization_style(OUTPUT_DIR)
     
     # Step 1: Find optimal configurations for different alphabet sizes
     print("\nStep 1: Finding optimal configurations for different alphabet sizes...")
