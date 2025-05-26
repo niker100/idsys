@@ -41,8 +41,8 @@ if [ -f "${IDCODES_DIR}/idcodes.cpython-312-x86_64-linux-gnu.so" ]; then
     ldconfig -p | grep -E 'IdcodesLibrary|crypto'
     
     # Verify libstdc++ version
-    echo "Checking libstdc++ version:"
-    strings /usr/lib/aarch64-linux-gnu/libstdc++.so.6 | grep 'GLIBCXX_3.4.32'
+    # echo "Checking libstdc++ version:"
+    # strings /usr/lib/aarch64-linux-gnu/libstdc++.so.6 | grep 'GLIBCXX_3.4.32'
     
     # Create a custom file for environment configuration
     echo "export LD_LIBRARY_PATH=${IDCODES_DIR}:/usr/local/lib/idcodes:/usr/local/lib:${LD_LIBRARY_PATH}" > /etc/profile.d/idcodes.sh
