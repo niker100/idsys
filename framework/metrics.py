@@ -13,7 +13,7 @@ import math
 from typing import Dict, List, Tuple
 from collections import Counter
 
-from core import IdSystem
+from .core import IdSystem
 
 
 class IdMetrics:
