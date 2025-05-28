@@ -7,12 +7,12 @@ identification systems based on various coding schemes.
 """
 
 from .core import (
-    IdEncoder, IdDecoder, IdSystem,
-    RSIDEncoder, RSIDDecoder,
-    RS2IDEncoder, RS2IDDecoder, 
-    RMIDEncoder, RMIDDecoder,
-    SHA1IDEncoder, SHA1IDDecoder,
-    SHA256IDEncoder, SHA256IDDecoder,
+    IdEncoder, IdVerifier, IdSystem,
+    RSIDEncoder, RSIDVerifier,
+    RS2IDEncoder, RS2IDVerifier, 
+    RMIDEncoder, RMIDVerifier,
+    SHA1IDEncoder, SHA1IDVerifier,
+    SHA256IDEncoder, SHA256IDVerifier,
     create_id_system, 
     generate_test_messages,
     _get_idcodes_instance
@@ -27,14 +27,14 @@ from .utils import (
 
 __all__ = [
     # Core classes
-    'IdEncoder', 'IdDecoder', 'IdSystem',
+    'IdEncoder', 'IdVerifier', 'IdSystem',
     
-    # Encoder/Decoder implementations
-    'RSIDEncoder', 'RSIDDecoder',
-    'RS2IDEncoder', 'RS2IDDecoder', 
-    'RMIDEncoder', 'RMIDDecoder',
-    'SHA1IDEncoder', 'SHA1IDDecoder',
-    'SHA256IDEncoder', 'SHA256IDDecoder',
+    # Encoder/Verifier implementations
+    'RSIDEncoder', 'RSIDVerifier',
+    'RS2IDEncoder', 'RS2IDVerifier', 
+    'RMIDEncoder', 'RMIDVerifier',
+    'SHA1IDEncoder', 'SHA1IDVerifier',
+    'SHA256IDEncoder', 'SHA256IDVerifier',
     
     # Factory and utility functions
     'create_id_system',

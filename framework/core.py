@@ -20,27 +20,27 @@ class IdEncoder:
         self.parameters.update(parameters)
 
 
-class IdDecoder:
+class IdVerifier:
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         self.parameters = parameters or {}
 
-    def decode(self, codeword: Any, message: Any) -> bool:
-        raise NotImplementedError("Subclasses must implement decode method")
+    def verify(self, codeword: Any, message: Any) -> bool:
+        raise NotImplementedError("Subclasses must implement verify method")
 
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         self.parameters.update(parameters)
 
 
 class IdSystem:
-    def __init__(self, encoder: IdEncoder, decoder: IdDecoder):
+    def __init__(self, encoder: IdEncoder, verifier: IdVerifier):
         self.encoder = encoder
-        self.decoder = decoder
+        self.verifier = verifier
 
     def send(self, message: Any) -> Any:
         return self.encoder.encode(message)
 
     def receive(self, codeword: Any, message: Any) -> bool:
-        return self.decoder.decode(codeword, message)
+        return self.verifier.verify(codeword, message)
 
 
 def _get_idcodes_instance(gf_exp: int):
@@ -87,8 +87,8 @@ class RSIDEncoder(IdEncoder):
         return result
 
 
-class RSIDDecoder(IdDecoder):
-    """Reed-Solomon Identification decoder."""
+class RSIDVerifier(IdVerifier):
+    """Reed-Solomon Identification verifier."""
     
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         super().__init__(parameters)
@@ -98,7 +98,7 @@ class RSIDDecoder(IdDecoder):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def decode(self, codeword: int, message: List[int]) -> bool:
+    def verify(self, codeword: int, message: List[int]) -> bool:
         recomputed_tag = self.encoder.encode(message)
         return recomputed_tag == codeword
 
@@ -145,8 +145,8 @@ class RS2IDEncoder(IdEncoder):
         return result
 
 
-class RS2IDDecoder(IdDecoder):
-    """Concatenated Reed-Solomon Identification decoder."""
+class RS2IDVerifier(IdVerifier):
+    """Concatenated Reed-Solomon Identification verifier."""
     
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         super().__init__(parameters)
@@ -156,7 +156,7 @@ class RS2IDDecoder(IdDecoder):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def decode(self, codeword: int, message: List[int]) -> bool:
+    def verify(self, codeword: int, message: List[int]) -> bool:
         recomputed_tag = self.encoder.encode(message)
         return recomputed_tag == codeword
 
@@ -194,8 +194,8 @@ class RMIDEncoder(IdEncoder):
         return result
 
 
-class RMIDDecoder(IdDecoder):
-    """Reed-Muller Identification decoder."""
+class RMIDVerifier(IdVerifier):
+    """Reed-Muller Identification verifier."""
     
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         super().__init__(parameters)
@@ -205,7 +205,7 @@ class RMIDDecoder(IdDecoder):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def decode(self, codeword: int, message: List[int]) -> bool:
+    def verify(self, codeword: int, message: List[int]) -> bool:
         recomputed_tag = self.encoder.encode(message)
         return recomputed_tag == codeword
 
@@ -235,8 +235,8 @@ class SHA1IDEncoder(IdEncoder):
         return result
 
 
-class SHA1IDDecoder(IdDecoder):
-    """SHA1-based Identification decoder."""
+class SHA1IDVerifier(IdVerifier):
+    """SHA1-based Identification verifier."""
     
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         super().__init__(parameters)
@@ -246,7 +246,7 @@ class SHA1IDDecoder(IdDecoder):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def decode(self, codeword: int, message: List[int]) -> bool:
+    def verify(self, codeword: int, message: List[int]) -> bool:
         recomputed_tag = self.encoder.encode(message)
         return recomputed_tag == codeword
 
@@ -276,8 +276,8 @@ class SHA256IDEncoder(IdEncoder):
         return result
 
 
-class SHA256IDDecoder(IdDecoder):
-    """SHA256-based Identification decoder."""
+class SHA256IDVerifier(IdVerifier):
+    """SHA256-based Identification verifier."""
     
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         super().__init__(parameters)
@@ -287,14 +287,14 @@ class SHA256IDDecoder(IdDecoder):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def decode(self, codeword: int, message: List[int]) -> bool:
+    def verify(self, codeword: int, message: List[int]) -> bool:
         recomputed_tag = self.encoder.encode(message)
         return recomputed_tag == codeword
 
 
 def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, Any]] = None) -> IdSystem:
     """
-    Create an identification system with the specified encoder/decoder type.
+    Create an identification system with the specified encoder/verifier type.
     
     Args:
         system_type: One of "RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"
@@ -303,22 +303,22 @@ def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, A
     parameters = parameters or {}
     
     systems = {
-        "RSID": (RSIDEncoder, RSIDDecoder),
-        "RS2ID": (RS2IDEncoder, RS2IDDecoder),
-        "RMID": (RMIDEncoder, RMIDDecoder),
-        "SHA1ID": (SHA1IDEncoder, SHA1IDDecoder),
-        "SHA256ID": (SHA256IDEncoder, SHA256IDDecoder)
+        "RSID": (RSIDEncoder, RSIDVerifier),
+        "RS2ID": (RS2IDEncoder, RS2IDVerifier),
+        "RMID": (RMIDEncoder, RMIDVerifier),
+        "SHA1ID": (SHA1IDEncoder, SHA1IDVerifier),
+        "SHA256ID": (SHA256IDEncoder, SHA256IDVerifier)
     }
     
     if system_type not in systems:
         raise ValueError(f"Unsupported system type: {system_type}. "
                         f"Supported types: {list(systems.keys())}")
     
-    encoder_class, decoder_class = systems[system_type]
+    encoder_class, verifier_class = systems[system_type]
     encoder = encoder_class(parameters)
-    decoder = decoder_class(parameters)
+    verifier = verifier_class(parameters)
     
-    return IdSystem(encoder, decoder)
+    return IdSystem(encoder, verifier)
 
 
 def generate_test_messages(vec_len: int, gf_exp: int, count: int = 1) -> List[List[int]]:

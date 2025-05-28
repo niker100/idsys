@@ -33,9 +33,9 @@ def main():
     print(f"Generated {len(messages)} test messages")
     
     # ==============================================
-    # 2. BASIC ENCODING/DECODING
+    # 2. BASIC ENCODING/VERIFICATION
     # ==============================================
-    print("\n2. Basic Encoding/Decoding:")
+    print("\n2. Basic Encoding/Verification:")
     print("-" * 30)
     
     for name, system in systems.items():

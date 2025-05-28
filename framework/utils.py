@@ -75,8 +75,8 @@ def batch_evaluate_parameters(
         message_set = generate_test_messages(vec_len, current_gf_exp, num_messages)
         
         # Update system parameters
-        system.encoder.parameters.update(params)
-        system.decoder.parameters.update(params)
+        system.encoder.set_parameters(params)
+        system.verifier.set_parameters(params)
 
 
         results[param_str] = IdMetrics.evaluate_system(
