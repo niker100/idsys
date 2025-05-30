@@ -23,7 +23,11 @@
 				"ms-python.python",
 				"ms-python.vscode-pylance"
 			]
-		}
+		}		
+	},
+
+	"containerEnv": {
+		"PYTHONPATH": "/workspaces/idsys:${PYTHONPATH}"
 	}
 	
 	// Add QEMU for ARM64 emulation
