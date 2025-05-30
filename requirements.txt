@@ -4,3 +4,4 @@ seaborn
 reedsolo
 pytest
 pandas
+psutils
