@@ -25,7 +25,7 @@ def main():
         metrics = IdMetrics.evaluate_system(
             rsid_system,
             messages,
-            num_trials=100000,
+            num_trials=1000000,
             timing_iterations=0,
             p_true_positive=tp_rate,
         )
