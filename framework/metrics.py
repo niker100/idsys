@@ -269,7 +269,8 @@ class IdMetrics:
         systems: Dict[str, IdSystem], 
         message_set: List[List[int]], 
         num_trials: int = 1000,
-        timing_iterations: int = 100
+        timing_iterations: int = 100,
+        p_true_positive: float = 0.5
     ) -> Dict[str, Dict[str, float]]:
         """
         Compare multiple identification systems.
@@ -288,7 +289,7 @@ class IdMetrics:
         for name, system in systems.items():
             print(f"Evaluating {name}...")
             results[name] = IdMetrics.evaluate_system(
-                system, message_set, num_trials, timing_iterations
+                system, message_set, num_trials, timing_iterations, p_true_positive
             )
         
         return results
