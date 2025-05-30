@@ -24,7 +24,8 @@ class IdMetrics:
         system: IdSystem, 
         message_set: List[List[int]], 
         num_trials: int = 1000,
-        timing_iterations: int = 100
+        timing_iterations: int = 100,
+        p_true_positive: float = 0.5
     ) -> Dict[str, float]:
         """
         Complete evaluation of an identification system.
@@ -56,7 +57,7 @@ class IdMetrics:
         
         # Calculate reliability and false positive rate
         reliability, fp_rate = IdMetrics._calculate_reliability_and_fp_rate(
-            system, message_set, num_trials
+            system, message_set, num_trials, p_true_positive
         )
         
         # Calculate execution time metrics
@@ -122,7 +123,8 @@ class IdMetrics:
     def _calculate_reliability_and_fp_rate(
         system: IdSystem, 
         message_set: List[List[int]], 
-        num_trials: int
+        num_trials: int,
+        p_true_positive: float = 0.5
     ) -> Tuple[float, float]:
         """Calculate reliability (correct identification rate) and false positive rate."""
         correct = 0
@@ -136,7 +138,7 @@ class IdMetrics:
             # Choose random message and identification scenario
             idx = np.random.randint(0, n)
             msg = message_set[idx]
-            is_true = np.random.choice([True, False])
+            is_true = np.random.choice([True, False], p=[p_true_positive, 1-p_true_positive])
 
             codeword = system.send(msg)
             if is_true:
