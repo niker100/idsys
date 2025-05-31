@@ -109,15 +109,8 @@ class IdMetrics:
     @staticmethod
     def _calculate_code_rate(system_type: str, avg_message_length: float, gf_exp: int) -> float:
         """Calculate effective code rate defined as the ratio of message bits to tag/output bits."""
-        if system_type in ['SHA1ID']:
-            # SHA1 produces 160-bit tags regardless of message length
-            return avg_message_length * 8 / 160.0
-        elif system_type in ['SHA256ID']:
-            # SHA256 produces 256-bit tags regardless of message length
-            return avg_message_length * 8 / 256.0
-        else:
-            # RS/RM systems: tag size = gf_exp bits
-            return avg_message_length * 8 / float(gf_exp)
+        # tag size = gf_exp bits
+        return avg_message_length * 8 / float(gf_exp)
     
     @staticmethod
     def _calculate_reliability_and_fp_rate(
