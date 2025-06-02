@@ -19,7 +19,7 @@ def main():
 
     # Range of vec_length values to test
     #num_messages = [10, 50, 100, 500, 1000, 5000, 10000]
-    num_messages = np.logspace(np.log10(100), np.log10(10000), num=20, dtype=int)
+    num_messages = np.linspace(1000, 10000, num=19, dtype=int)
 
     # Create systems as a dictionary for compare_systems
     systems = {
