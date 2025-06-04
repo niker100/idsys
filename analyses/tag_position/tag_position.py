@@ -36,7 +36,7 @@ def main():
     #iterate through all tag positions (deterministic)
     for tag_pos in tag_positions:
         print(f"\nEvaluating with Tag position: {tag_pos}")
-        systems = {name: make_sys(tag_positions) for name, make_sys in system_types}
+        systems = {name: make_sys(tag_pos) for name, make_sys in system_types}
 
         metrics = IdMetrics.compare_systems(
             systems,
@@ -53,7 +53,7 @@ def main():
             system_results[system_name]['reliability'].append(system_metrics["reliability"])
             system_results[system_name]['exec_time'].append(system_metrics["avg_execution_time_ms"])
 
-    #evaluate system for random tag position
+    '''#evaluate system for random tag position
     print(f"\nEvaluating with Random tag position")
     tag_positions_random = np.random.randint(0,3, size = 100)
     systems_random = {name: make_sys(tag_positions_random) for name, make_sys in system_types_random}
@@ -70,7 +70,7 @@ def main():
     for system_name, system_metrics in metrics_random.items():
             system_results[system_name]['tag_position'].append(-1) #for random positioning
             system_results[system_name]['reliability'].append(system_metrics["reliability"])
-            system_results[system_name]['exec_time'].append(system_metrics["avg_execution_time_ms"])
+            system_results[system_name]['exec_time'].append(system_metrics["avg_execution_time_ms"])'''
 
     # Plot reliability vs tag position
     plt.figure(figsize=(12, 6))
@@ -90,6 +90,7 @@ def main():
     plt.legend(fontsize=10)
     plt.xticks(tag_positions)
     plt.tight_layout()
+    plt.show()
     plt.savefig('analyses/tag_position/reliability_vs_tag_position.png', dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
