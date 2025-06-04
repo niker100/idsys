@@ -11,14 +11,13 @@ def main():
     print("=" * 50)
 
     # Range of vec_length values to test
-    vec_lengths = [4, 8, 16, 32, 64, 128]
-    #vec_lengths = [10, 30, 50, 70, 90, 110]
+    vec_lengths = [2**i for i in range(1, 14)]
 
     # Create systems as a dictionary for compare_systems
     systems = {
-        "RSID": lambda vec_len: create_id_system("RSID", {"gf_exp": 8, "tag_pos": 2, "vec_len": vec_len}),
-        "RMID": lambda vec_len: create_id_system("RMID", {"gf_exp": 8, "tag_pos": 2, "vec_len": vec_len}),
-        "SHA1ID": lambda vec_len: create_id_system("SHA1ID", {"gf_exp": 8, "vec_len": vec_len})
+        "RSID": lambda vec_len: create_id_system("RSID", {"gf_exp": 8, "tag_pos": 2}),
+        "RMID": lambda vec_len: create_id_system("RMID", {"gf_exp": 8, "tag_pos": 2}),
+        "SHA1ID": lambda vec_len: create_id_system("SHA1ID", {"gf_exp": 8})
     }
 
     # Store results for each system
@@ -26,12 +25,12 @@ def main():
 
     for vec_len in vec_lengths:
         print(f"\nEvaluating with vec_length: {vec_len}")
-        messages = generate_test_messages(vec_len=vec_len, gf_exp=8, count=100)
+        messages = generate_test_messages(vec_len=vec_len, gf_exp=8, count=1000)
         system_instances = {name: make_sys(vec_len) for name, make_sys in systems.items()}
         metrics = IdMetrics.compare_systems(
             system_instances,
             messages,
-            num_trials=10000,
+            num_trials=800000,
             timing_iterations=1000,
             p_true_positive=0.5
         )
@@ -55,6 +54,7 @@ def main():
     plt.title('Reliability vs vec_length - System Comparison', fontsize=14, fontweight='bold')
     plt.xlabel('vec_length', fontsize=12)
     plt.ylabel('Reliability', fontsize=12)
+    plt.xscale('log', base=2)
     plt.grid(True, alpha=0.3)
     plt.legend(fontsize=10)
     plt.xticks(vec_lengths)
@@ -74,6 +74,8 @@ def main():
     plt.xlabel('vec_length', fontsize=12)
     plt.ylabel('Avg Execution Time (ms)', fontsize=12)
     plt.grid(True, alpha=0.3)
+    plt.xscale('log', base=2)
+    plt.yscale('log')
     plt.legend(fontsize=10)
     plt.xticks(vec_lengths)
     plt.tight_layout()
@@ -92,6 +94,8 @@ def main():
     plt.xlabel('vec_length', fontsize=12)
     plt.ylabel('Code Rate', fontsize=12)
     plt.grid(True, alpha=0.3)
+    plt.xscale('log', base=2)
+    plt.yscale('log')
     plt.legend(fontsize=10)
     plt.xticks(vec_lengths)
     plt.tight_layout()
