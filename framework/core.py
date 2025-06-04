@@ -73,7 +73,9 @@ class RSIDEncoder(IdEncoder):
     def _init_idcodes(self):
         self.gf_exp = self.parameters["gf_exp"]
         self.idcodes = _get_idcodes_instance(self.gf_exp)
-        self.idcodes.generate_gf_outer(self.gf_exp)
+        if self.gf_exp <= 16:
+            self.idcodes.generate_gf_outer(self.gf_exp)
+            
         self.exp_arr = self.idcodes.get_exp_arr()
         self.log_arr = self.idcodes.get_log_arr()
     
@@ -120,8 +122,11 @@ class RS2IDEncoder(IdEncoder):
     def _init_idcodes(self):
         self.gf_exp = self.parameters["gf_exp"]
         self.idcodes = _get_idcodes_instance(self.gf_exp)
-        self.idcodes.generate_gf_outer(self.gf_exp)
-        self.idcodes.generate_gf_inner(self.gf_exp)
+        if self.gf_exp <= 16:
+            self.idcodes.generate_gf_outer(self.gf_exp)
+            self.idcodes.generate_gf_inner(self.gf_exp)
+        elif self.gf_exp <= 32:
+            self.idcodes.generate_gf_inner(self.gf_exp // 2)
         
         self.exp_arr = self.idcodes.get_exp_arr()
         self.log_arr = self.idcodes.get_log_arr()
@@ -178,7 +183,9 @@ class RMIDEncoder(IdEncoder):
     def _init_idcodes(self):
         self.gf_exp = self.parameters["gf_exp"]
         self.idcodes = _get_idcodes_instance(self.gf_exp)
-        self.idcodes.generate_gf_outer(self.gf_exp)
+        if self.gf_exp <= 16:
+            self.idcodes.generate_gf_outer(self.gf_exp)
+
         self.exp_arr = self.idcodes.get_exp_arr()
         self.log_arr = self.idcodes.get_log_arr()
     
