@@ -25,7 +25,8 @@ class IdMetrics:
         message_set: List[List[int]], 
         num_trials: int = 1000,
         timing_iterations: int = 100,
-        p_true_positive: float = 0.5
+        p_true_positive: float = 0.5,
+        max_messages: int = 10
     ) -> Dict[str, float]:
         """
         Complete evaluation of an identification system.
@@ -35,6 +36,8 @@ class IdMetrics:
             message_set: List of messages (each message is List[int])
             num_trials: Number of trials for reliability/error rate calculation
             timing_iterations: Number of iterations for timing measurements
+            p_true_positive: Probability of a true positive identification
+            max_messages: Maximum number of messages to consider for compute intensive metrics
             
         Returns:
             Dictionary containing all metrics
@@ -69,10 +72,10 @@ class IdMetrics:
         comp_efficiency = code_rate / timing_metrics['avg_execution_time_ms'] if timing_metrics['avg_execution_time_ms'] > 0 else 0
         
         # Calculate entropy metrics
-        entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set, gf_exp)
+        entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set[0:max_messages], gf_exp)
         
         # Calculate tag distribution metrics
-        tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[:min(100, len(message_set))])
+        tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[0:max_messages])
         
         # Compile comprehensive results
         results = {
@@ -100,6 +103,7 @@ class IdMetrics:
             'tag_size_bits': float(gf_exp),
             'avg_message_length': avg_message_length,
             'message_length_std': np.std(message_lengths),
+            'unique_tags': tag_metrics['unique_tags'],
             'tag_uniqueness': tag_metrics['tag_uniqueness'],
             'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity']            
         }
@@ -149,7 +153,7 @@ class IdMetrics:
                     correct += 1
 
 
-        reliability = correct / num_trials
+        reliability = correct / num_trials if num_trials > 0 else 0.0
         fp_rate = false_positives / max(negatives, 1)
         return reliability, fp_rate
     
@@ -248,10 +252,11 @@ class IdMetrics:
         
         # Calculate distribution uniformity (how close to uniform distribution)
         # This is the relative entropy compared to a uniform distribution
-        # D(p_X || p_U) = H(X) - log2(|χ|) where X is the random variable, |χ| the size of the alphabet 
-        uniformity = tag_entropy - math.log2(unique_tags) if unique_tags > 0 else 0.0
+        # D(p_X || p_U) = log2(|χ|) - H(X) where X is the random variable, |χ| the size of the alphabet 
+        uniformity = math.log2(unique_tags) - tag_entropy if unique_tags > 0 else 0.0
         
         return {
+            'unique_tags': unique_tags,
             'tag_entropy': tag_entropy,
             'tag_uniqueness': tag_uniqueness,
             'tag_distribution_uniformity': uniformity
