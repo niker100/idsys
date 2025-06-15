@@ -59,7 +59,7 @@ class IdMetrics:
         code_rate = IdMetrics._calculate_code_rate(system_type, avg_message_length, gf_exp)
         
         # Calculate reliability and false positive rate
-        reliability, fp_rate = IdMetrics._calculate_reliability_and_fp_rate(
+        reliability, fp_rate, false_positives = IdMetrics._calculate_reliability_and_fp_rate(
             system, message_set, num_trials, p_true_positive
         )
         
@@ -82,6 +82,7 @@ class IdMetrics:
             # Core performance metrics
             'reliability': reliability,
             'false_positive_rate': fp_rate,
+            'false_positives': false_positives,
             'code_rate': code_rate,
             
             # Timing metrics
@@ -155,7 +156,7 @@ class IdMetrics:
 
         reliability = correct / num_trials if num_trials > 0 else 0.0
         fp_rate = false_positives / max(negatives, 1)
-        return reliability, fp_rate
+        return reliability, fp_rate, false_positives
     
     @staticmethod
     def _calculate_timing_metrics(
