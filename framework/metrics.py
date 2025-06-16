@@ -105,7 +105,8 @@ class IdMetrics:
             'message_length_std': np.std(message_lengths),
             'unique_tags': tag_metrics['unique_tags'],
             'tag_uniqueness': tag_metrics['tag_uniqueness'],
-            'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity']            
+            'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity'],
+            'tag_max_value': tag_metrics['tag_max_value'],        
         }
         
         return results
@@ -254,12 +255,15 @@ class IdMetrics:
         # This is the relative entropy compared to a uniform distribution
         # D(p_X || p_U) = log2(|χ|) - H(X) where X is the random variable, |χ| the size of the alphabet 
         uniformity = math.log2(unique_tags) - tag_entropy if unique_tags > 0 else 0.0
+
+        tag_max_value = max(tag_counts.keys()) if tag_counts else 0
         
         return {
             'unique_tags': unique_tags,
             'tag_entropy': tag_entropy,
             'tag_uniqueness': tag_uniqueness,
-            'tag_distribution_uniformity': uniformity
+            'tag_distribution_uniformity': uniformity,
+            'tag_max_value': tag_max_value
         }
     
     @staticmethod

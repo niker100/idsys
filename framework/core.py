@@ -355,7 +355,7 @@ def generate_test_messages(vec_len: int, gf_exp: int, count: int = 1) -> List[Li
     
     messages = []
     for _ in range(count):
-        message = Id.generate_string_sequence(vec_len)
+        message = Id.generate_string_sequence(vec_len_)
         messages.append(message)
     
     return messages
