@@ -1,12 +1,12 @@
 # True Positive Rate Influence Analysis - Findings
 
 ## Overview
-This analysis examined how varying the true positive rate (probability of positive identification scenarios) affects the reliability and false positive rates of three identification systems: RSID, RMID, and SHA1ID using 5,000,000 trials per data point.
+This analysis examined how varying the true positive rate (probability of positive identification scenarios) affects the reliability and false positive rates of three identification systems: RSID, RMID, and SHA1ID using 1,000,000 trials per data point.
 
 ## Methodology
 - **Systems Tested**: Reed-Solomon ID (RSID), Reed-Muller ID (RMID), and SHA1-based ID (SHA1ID)
-- **Parameters**: All systems configured with GF exponent = 8, message length = 16 bytes, 100 messages
-- **True Positive Rate Range**: 0.0 to 1.0 in 0.05 increments
+- **Parameters**: All systems configured with GF exponent = 8, message length = 16 bytes, 10000 messages
+- **True Positive Rate Range**: 0.0 to 1.0 in 0.2 increments
 - **Test Protocol**: Based on `_calculate_reliability_and_fp_rate()` method from metrics.py
 
 ## Definitions from our Framework
@@ -31,31 +31,26 @@ Where `false_positives` occur when `system.receive(codeword, different_msg) == T
 ### 1. Reliability Performance
 **Linear relationship with true positive rate:**
 
-- **SHA1ID**: Best performing system
-  - Range: 99.64% (p=0.0) to 100% (p=1.0)
-  - Slope: 0.36% reliability improvement per unit true positive rate increase
-  
-- **RMID**: Intermediate performance  
-  - Range: 99.49% (p=0.0) to 100% (p=1.0)
-  - Slope: 0.51% reliability improvement per unit true positive rate increase
-  
-- **RSID**: Steepest reliability dependence
-  - Range: 99.42% (p=0.0) to 100% (p=1.0)
-  - Slope: 0.58% reliability improvement per unit true positive rate increase
+- **All systems** show remarkably similar performance:
+  - Average reliability: 0.9980 (99.8%)
+  - Range: ~0.9960 (p=0.0) to 1.0000 (p=1.0)
+  - Slope: 0.0039 (0.39%) reliability improvement per unit true positive rate increase
 
 ### 2. False Positive Rate Analysis
 **Constant FPR values independent of true positive rate:**
 
-- **SHA1ID**: FPR ≈ 0.0036 (0.36%)
-- **RMID**: FPR ≈ 0.0051 (0.51%)  
-- **RSID**: FPR ≈ 0.0058 (0.58%)
+- **RSID**: FPR ≈ 0.003921 (0.39%)
+- **RMID**: FPR ≈ 0.003961 (0.40%)  
+- **SHA1ID**: FPR ≈ 0.003981 (0.40%)
 
-**observation**: The dramatic drop to 0% at p=1.0 occurs because no negative identification scenarios exist when true positive rate = 1.0.
+All systems show FPR values very close to the theoretical 2^-8 ≈ 0.00390625 (0.39%).
+
+**Observation**: The drop to 0% FPR at p=1.0 occurs because no negative identification scenarios exist when true positive rate = 1.0.
 
 ## Discoveries
 
 ### Linear Relationship
-The experimental data reveals the relationship:
+The experimental data confirms the relationship:
 
 **`(reliability - 1) = false_positive_rate × (true_positive_rate - 1)`**
 
@@ -85,21 +80,20 @@ This confirms the observed linear relationship and validates the experiment.
 
 #### Experimental Findings
 The slopes in reliability plots exactly match the false positive rates:
-- SHA1ID: slope = 0.36% = FPR
-- RMID: slope = 0.51% = FPR
-- RSID: slope = 0.58% = FPR
+- All systems: slope ≈ 0.0039 = FPR ≈ 2^-8
 
 This validates our derived relationship: `d(reliability)/d(p) = FPR`
 
 ## System Comparison
 
 ### Cryptographic vs. Coding Theory Approaches
-1. **SHA1ID** (cryptographic hash):
-   - Lowest FPR due to cryptographic collision resistance
+With GF exponent = 8 configuration, all three systems demonstrate nearly identical performance:
 
-2. **RMID/RSID** (error-correcting codes):
-   - Higher FPR due to algebraic structure limitations
-   - Reed-Muller slightly outperforms Reed-Solomon in this configuration
+1. **SHA1ID** (cryptographic hash): FPR ≈ 0.003981
+2. **RMID** (Reed-Muller): FPR ≈ 0.003961
+3. **RSID** (Reed-Solomon): FPR ≈ 0.003921
+
+These results suggest that with this parameter configuration, the algebraic properties of the coding-based systems (RSID, RMID) can achieve performance comparable to cryptographic approaches.
 
 ## Implications for Metrics Usage
 
@@ -108,7 +102,7 @@ This validates our derived relationship: `d(reliability)/d(p) = FPR`
 
 **Practical implications**:
 - **Authentication systems** (high positive rate): All systems perform similarly (>99.9%)
-- **Intrusion detection** (low positive rate): SHA1ID provides significant advantage
+- **Intrusion detection** (low positive rate): All systems maintain good reliability (≈99.6%)
 - **Mixed workloads**: Performance can be predicted using `reliability = 1 - FPR × (1-p)`
 
 ### 2. False Positive Rate as Primary Metric
@@ -127,17 +121,3 @@ Systems with lower FPR are:
 - More stable across different workloads
 - Better suited for variable or unknown scenario distributions
 - Preferable for high-security applications
-
-### 4. Benchmarking Recommendations
-1. **Report both metrics**: FPR for intrinsic performance, reliability for specific scenarios
-2. **Standardize test conditions**: Use p=0.5 for balanced comparison
-3. **Sensitivity analysis**: Test across multiple true positive rates for robust evaluation
-
-## Conclusions
-
-The discovered mathematical relationship `(reliability - 1) = FPR × (p - 1)` provides:
-1. **Predictive capability**: Calculate reliability for any scenario distribution
-2. **System ranking**: FPR serves as a scenario-independent quality metric
-3. **Design guidance**: Minimize FPR for robust performance across applications
-
-This analysis demonstrates that traditional reliability metrics must be interpreted within their scenario context, while false positive rates provide more fundamental system characterization for identification system design and evaluation.
