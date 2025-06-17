@@ -218,7 +218,7 @@ class IdMetrics:
             # Time the verification operation
             start_time = time.perf_counter()
 
-            if not system.receive(codeword, message_set[i]):
+            if system.receive(codeword, message_set[i]):
                 false_positives += 1
 
             end_time = time.perf_counter()
