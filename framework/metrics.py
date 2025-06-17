@@ -293,9 +293,9 @@ class IdMetrics:
                 tag_entropy -= prob * math.log2(prob)
         
         # Calculate uniqueness (fraction of unique tags)
-        unique_tags = len(tag_counts)
-        tag_uniqueness = unique_tags / total_tags
-        
+        unique_tags = len(tag_counts) if total_tags > 0 else 0
+        tag_uniqueness = unique_tags / total_tags if total_tags > 0 else 0.0
+
         # Calculate distribution uniformity (how close to uniform distribution)
         # This is the relative entropy compared to a uniform distribution
         # D(p_X || p_U) = log2(|χ|) - H(X) where X is the random variable, |χ| the size of the alphabet 
