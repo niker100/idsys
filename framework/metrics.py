@@ -277,9 +277,11 @@ class IdMetrics:
         
         if not tags:
             return {
+                'unique_tags': 0.0,
                 'tag_entropy': 0.0,
                 'tag_uniqueness': 0.0,
-                'tag_distribution_uniformity': 0.0
+                'tag_distribution_uniformity': 0.0,
+                'tag_max_value': 0.0
             }
         
         # Calculate tag entropy
@@ -314,10 +316,9 @@ class IdMetrics:
     @staticmethod
     def compare_systems(
         systems: Dict[str, IdSystem], 
-        message_set: List[List[int]], 
-        num_trials: int = 1000,
-        timing_iterations: int = 100,
-        p_true_positive: float = 0.5
+        num_messages: int = 1000, 
+        vec_len: int = 16,
+        message_subset_size: int = 10
     ) -> Dict[str, Dict[str, float]]:
         """
         Compare multiple identification systems.
@@ -336,7 +337,7 @@ class IdMetrics:
         for name, system in systems.items():
             print(f"Evaluating {name}...")
             results[name] = IdMetrics.evaluate_system(
-                system, message_set, num_trials, timing_iterations, p_true_positive
+                system, num_messages, vec_len, message_subset_size
             )
         
         return results
