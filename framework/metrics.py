@@ -13,7 +13,7 @@ import math
 from typing import Dict, List, Tuple
 from collections import Counter
 
-from .core import IdSystem
+from .core import IdSystem, generate_test_messages
 
 
 class IdMetrics:
@@ -21,35 +21,31 @@ class IdMetrics:
     
     @staticmethod
     def evaluate_system(
-        system: IdSystem, 
-        message_set: List[List[int]], 
-        num_trials: int = 1000,
-        timing_iterations: int = 100,
-        p_true_positive: float = 0.5,
-        max_messages: int = 10
+        system: IdSystem,
+        num_messages: int = 1000,
+        vec_len: int = 16,
+        message_subset_size: int = 10
     ) -> Dict[str, float]:
         """
         Complete evaluation of an identification system.
         
         Args:
             system: The identification system to evaluate
-            message_set: List of messages (each message is List[int])
-            num_trials: Number of trials for reliability/error rate calculation
-            timing_iterations: Number of iterations for timing measurements
-            p_true_positive: Probability of a true positive identification
-            max_messages: Maximum number of messages to consider for compute intensive metrics
-            
+            num_messages: Number of messages to generate to evaluate the system
+            vec_len: Length of the messages in byte
+            message_subset_size: Size of the message subset to consider for compute intensive metrics
+
         Returns:
             Dictionary containing all metrics
         """
-        if not message_set:
-            raise ValueError("Message set cannot be empty")
         
         # Get system parameters for code rate calculation
         encoder = system.encoder
         params = getattr(encoder, 'parameters', {})
         gf_exp = params.get('gf_exp', 8)
         system_type = type(encoder).__name__.replace('Encoder', '')
+
+        message_set = generate_test_messages(vec_len, gf_exp, num_messages)
         
         # Calculate message length statistics
         message_lengths = [len(msg) for msg in message_set]
@@ -58,29 +54,30 @@ class IdMetrics:
         # Calculate code rate
         code_rate = IdMetrics._calculate_code_rate(system_type, avg_message_length, gf_exp)
         
-        # Calculate reliability and false positive rate
-        reliability, fp_rate, false_positives = IdMetrics._calculate_reliability_and_fp_rate(
-            system, message_set, num_trials, p_true_positive
-        )
+        # # Calculate reliability and false positive rate
+        # reliability, fp_rate, false_positives = IdMetrics._calculate_reliability_and_fp_rate(
+        #     system, message_set, num_trials, p_true_positive
+        # )
         
-        # Calculate execution time metrics
-        timing_metrics = IdMetrics._calculate_timing_metrics(
-            system, message_set, timing_iterations
-        )
+        # # Calculate execution time metrics
+        # timing_metrics = IdMetrics._calculate_timing_metrics(
+        #     system, message_set, timing_iterations
+        # )
+
+        fp_rate, false_positives, timing_metrics = IdMetrics._propagate_messages(system, message_set)
         
         # Calculate computational efficiency
         comp_efficiency = code_rate / timing_metrics['avg_execution_time_ms'] if timing_metrics['avg_execution_time_ms'] > 0 else 0
         
         # Calculate entropy metrics
-        entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set[0:max_messages], gf_exp)
+        entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set[0:message_subset_size], gf_exp)
         
         # Calculate tag distribution metrics
-        tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[0:max_messages])
+        tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[0:message_subset_size])
         
         # Compile comprehensive results
         results = {
             # Core performance metrics
-            'reliability': reliability,
             'false_positive_rate': fp_rate,
             'false_positives': false_positives,
             'code_rate': code_rate,
@@ -118,6 +115,7 @@ class IdMetrics:
         # tag size = gf_exp bits
         return avg_message_length * 8 / float(gf_exp)
     
+    @DeprecationWarning
     @staticmethod
     def _calculate_reliability_and_fp_rate(
         system: IdSystem, 
@@ -159,6 +157,7 @@ class IdMetrics:
         fp_rate = false_positives / max(negatives, 1)
         return reliability, fp_rate, false_positives
     
+    @DeprecationWarning
     @staticmethod
     def _calculate_timing_metrics(
         system: IdSystem, 
@@ -197,6 +196,51 @@ class IdMetrics:
             'max_execution_time_ms': float(np.max(times)),
             'std_execution_time_ms': float(np.std(times))
         }
+    
+    @staticmethod
+    def _propagate_messages(
+        system: IdSystem,
+        message_set: List[List[int]]
+    ) -> Tuple[float, int, Dict[str, float]]:
+        """Pick first message as message at sender and cycle through the rest of the messages at the receiver while timing the process."""
+        n = len(message_set)
+        if n < 2:
+            raise ValueError("Message set must contain at least two distinct messages for meaningful evaluation.")
+        # Use the first message as the one to receive
+        first_message = message_set[0]
+        false_positives = 0
+        times = []
+
+        # Send the first message to get the codeword
+        codeword = system.send(first_message)
+
+        for i in range(1, n):
+            # Time the verification operation
+            start_time = time.perf_counter()
+
+            if not system.receive(codeword, message_set[i]):
+                false_positives += 1
+
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
+            times.append(execution_time_ms)
+        if not times:
+            return 0.0, false_positives, {
+                'avg_execution_time_ms': 0.0,
+                'min_execution_time_ms': 0.0,
+                'max_execution_time_ms': 0.0,
+                'std_execution_time_ms': 0.0
+            }
+        # Calculate false positive rate
+        fp_rate = false_positives / (n - 1)
+        # Calculate timing metrics
+        timing_metrics = {
+            'avg_execution_time_ms': float(np.mean(times)),
+            'min_execution_time_ms': float(np.min(times)),
+            'max_execution_time_ms': float(np.max(times)),
+            'std_execution_time_ms': float(np.std(times))
+        }
+        return fp_rate, false_positives, timing_metrics
     
     @staticmethod
     def _calculate_entropy_metrics(message_set: List[List[int]], gf_exp: int) -> Dict[str, float]:
