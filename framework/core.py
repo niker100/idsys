@@ -120,7 +120,7 @@ class RS2IDEncoder(IdEncoder):
         self._init_idcodes()
     
     def _init_idcodes(self):
-        self.gf_exp = self.parameters["gf_exp"]
+        self.gf_exp = 2 * self.parameters["gf_exp"] # Due to concatenation
         self.idcodes = _get_idcodes_instance(self.gf_exp)
         if self.gf_exp <= 16:
             self.idcodes.generate_gf_outer(self.gf_exp)
