@@ -56,7 +56,7 @@ def main():
 
     # Save system results to a file for analysis in a different script
 
-    output_file = 'analyses/gf_exp_influence/system_results2.json'
+    output_file = 'analyses/gf_exp_influence/system_results.json'
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     # Include additional metadata in the results
