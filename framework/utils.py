@@ -7,33 +7,6 @@ from .core import IdSystem, generate_test_messages
 from .metrics import IdMetrics
 
 
-def evaluate_system_with_generated_messages(
-    system: IdSystem,
-    vec_len: int,
-    num_messages: int = 100,
-    **kwargs
-) -> Dict[str, float]:
-    """
-    Evaluate a system with automatically generated test messages.
-    
-    Args:
-        system: The identification system to evaluate
-        vec_len: Vector length for message generation
-        num_messages: Number of messages to generate
-        **kwargs: Additional arguments passed to evaluate_system
-        
-    Returns:
-        metrics dictionary
-    """
-    gf_exp = system.encoder.parameters.get('gf_exp')
-
-    if gf_exp is None:
-        raise ValueError("System encoder must have 'gf_exp' parameter set.")
-    
-    message_set = generate_test_messages(vec_len, gf_exp, num_messages)
-    return IdMetrics.evaluate_system(system, message_set, **kwargs)
-
-
 def batch_evaluate_parameters(
     system: IdSystem,
     parameter_grid: Dict[str, List[Any]],

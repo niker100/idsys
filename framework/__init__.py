@@ -21,7 +21,6 @@ from .core import (
 from .metrics import IdMetrics
 
 from .utils import (
-    evaluate_system_with_generated_messages,
     batch_evaluate_parameters
 )
 
@@ -48,6 +47,5 @@ __all__ = [
     'IdMetrics',
     
     # Utilities
-    'evaluate_system_with_generated_messages',
     'batch_evaluate_parameters'
 ]
