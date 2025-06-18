@@ -10,10 +10,36 @@ efficiency, error rates, etc.
 import numpy as np
 import time
 import math
+import multiprocessing as mp
 from typing import Dict, List, Tuple
 from collections import Counter
 
-from .core import IdSystem, generate_test_messages
+from .core import IdSystem, generate_test_messages, create_id_system
+
+
+def _worker_propagate_messages(args):
+    """Worker function for parallel message propagation."""
+    system_type, system_params, codeword, message_batch, batch_start_idx, num_validation_messages = args
+    
+    # Recreate the system in the worker process to avoid pickling issues
+    system = create_id_system(system_type, system_params)
+    
+    false_positives = 0
+    times = []
+    
+    for i in range(0, len(message_batch), num_validation_messages):
+        # Time the verification operation
+        start_time = time.perf_counter()
+        
+        validation_msgs = message_batch[i:i + num_validation_messages]
+        if system.receive_k(codeword, validation_msgs):
+            false_positives += len(validation_msgs)
+        
+        end_time = time.perf_counter()
+        execution_time_ms = (end_time - start_time) * 1000
+        times.append(execution_time_ms)
+    
+    return false_positives, times
 
 
 class IdMetrics:
@@ -22,9 +48,12 @@ class IdMetrics:
     @staticmethod
     def evaluate_system(
         system: IdSystem,
-        num_messages: int = 1000,
+        num_messages: int = 100000,
         vec_len: int = 16,
-        message_subset_size: int = 10
+        num_validation_messages: int = 1,
+        save_interval: int = 1000,
+        message_subset_size: int = 10,
+        num_processes: int = None
     ) -> Dict[str, float]:
         """
         Complete evaluation of an identification system.
@@ -33,7 +62,10 @@ class IdMetrics:
             system: The identification system to evaluate
             num_messages: Number of messages to generate to evaluate the system
             vec_len: Length of the messages in byte
+            num_validation_messages: Number of valid messages at the receiver for k-identification problem
+            save_interval: Interval for saving intermediate results
             message_subset_size: Size of the message subset to consider for compute intensive metrics
+            num_processes: Number of processes to use for parallelization (None for auto)
 
         Returns:
             Dictionary containing all metrics
@@ -54,16 +86,15 @@ class IdMetrics:
         # Calculate code rate
         code_rate = IdMetrics._calculate_code_rate(system_type, avg_message_length, gf_exp)
 
-        fp_rate, false_positives, timing_metrics = IdMetrics._propagate_messages(system, message_set)
+        fp_rate, false_positives, timing_metrics = IdMetrics._propagate_messages_parallel(
+            system, message_set, num_validation_messages, num_processes
+        )
 
-        # Calculate computational efficiency
-        comp_efficiency = code_rate / timing_metrics['avg_execution_time_ms'] if timing_metrics['avg_execution_time_ms'] > 0 else 0
-        
         # Calculate entropy metrics
-        entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set[0:message_subset_size], gf_exp)
+        # entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set[0:message_subset_size], gf_exp)
         
         # Calculate tag distribution metrics
-        tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[0:message_subset_size])
+        # tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[0:message_subset_size])
         
         # Compile comprehensive results
         results = {
@@ -79,22 +110,21 @@ class IdMetrics:
             'std_execution_time_ms': timing_metrics['std_execution_time_ms'],
             
             # Efficiency metrics
-            'computational_efficiency': comp_efficiency,
             'throughput_msgs_per_sec': 1000.0 / timing_metrics['avg_execution_time_ms'] if timing_metrics['avg_execution_time_ms'] > 0 else 0,
             
             # Information theory metrics
-            'message_entropy': entropy_metrics['message_entropy'],
-            'tag_entropy': tag_metrics['tag_entropy'],
-            'compression_ratio': entropy_metrics['message_entropy'] / tag_metrics['tag_entropy'] if tag_metrics['tag_entropy'] > 0 else 0,
+            # 'message_entropy': entropy_metrics['message_entropy'],
+            # 'tag_entropy': tag_metrics['tag_entropy'],
+            # 'compression_ratio': entropy_metrics['message_entropy'] / tag_metrics['tag_entropy'] if tag_metrics['tag_entropy'] > 0 else 0,
             
             # System characteristics
             'tag_size_bits': float(gf_exp),
             'avg_message_length': avg_message_length,
             'message_length_std': np.std(message_lengths),
-            'unique_tags': tag_metrics['unique_tags'],
-            'tag_uniqueness': tag_metrics['tag_uniqueness'],
-            'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity'],
-            'tag_max_value': tag_metrics['tag_max_value'],        
+            # 'unique_tags': tag_metrics['unique_tags'],
+            # 'tag_uniqueness': tag_metrics['tag_uniqueness'],
+            # 'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity'],
+            # 'tag_max_value': tag_metrics['tag_max_value'],        
         }
         
         return results
@@ -105,11 +135,98 @@ class IdMetrics:
         # tag size = gf_exp bits
         return avg_message_length * 8 / float(gf_exp)
     
+    @staticmethod
+    def _get_system_info(system: IdSystem) -> Tuple[str, Dict]:
+        """Extract system type and parameters for recreation."""
+        encoder = system.encoder
+        system_type = type(encoder).__name__.replace('Encoder', '')
+        params = getattr(encoder, 'parameters', {})
+        return system_type, params
+    
+    @staticmethod
+    def _propagate_messages_parallel(
+        system: IdSystem,
+        message_set: List[List[int]],
+        num_validation_messages: int = 1,
+        num_processes: int = None
+    ) -> Tuple[float, int, Dict[str, float]]:
+        """Parallelized version of _propagate_messages."""
+        n = len(message_set)
+        if n < 2:
+            raise ValueError("Message set must contain at least two distinct messages for meaningful evaluation.")
+        
+        # Use the first message as the one to receive
+        first_message = message_set[0]
+        remaining_messages = message_set[1:]
+        
+        # Send the first message to get the codeword
+        codeword = system.send(first_message)
+        
+        # Set number of processes
+        if num_processes is None:
+            num_processes = min(mp.cpu_count(), len(remaining_messages) // 100 + 1)
+        
+        # Split remaining messages into chunks for parallel processing
+        chunk_size = max(1, len(remaining_messages) // num_processes)
+        message_chunks = [
+            remaining_messages[i:i + chunk_size] 
+            for i in range(0, len(remaining_messages), chunk_size)
+        ]
+        
+        # Get system info for recreation in worker processes
+        system_type, system_params = IdMetrics._get_system_info(system)
+        
+        # Prepare arguments for worker processes
+        worker_args = [
+            (system_type, system_params, codeword, chunk, i * chunk_size, num_validation_messages)
+            for i, chunk in enumerate(message_chunks)
+        ]
+        
+        # Process chunks in parallel
+        total_false_positives = 0
+        all_times = []
+        
+        if num_processes == 1 or len(message_chunks) == 1:
+            # Single process execution for small datasets or when requested
+            for args in worker_args:
+                fp, times = _worker_propagate_messages(args)
+                total_false_positives += fp
+                all_times.extend(times)
+        else:
+            # Multi-process execution
+            with mp.Pool(processes=num_processes) as pool:
+                results = pool.map(_worker_propagate_messages, worker_args)
+            
+            for fp, times in results:
+                total_false_positives += fp
+                all_times.extend(times)
+        
+        if not all_times:
+            return 0.0, total_false_positives, {
+                'avg_execution_time_ms': 0.0,
+                'min_execution_time_ms': 0.0,
+                'max_execution_time_ms': 0.0,
+                'std_execution_time_ms': 0.0
+            }
+        
+        # Calculate false positive rate
+        fp_rate = total_false_positives / (n - 1) 
+        
+        # Calculate timing metrics
+        timing_metrics = {
+            'avg_execution_time_ms': float(np.mean(all_times)),
+            'min_execution_time_ms': float(np.min(all_times)),
+            'max_execution_time_ms': float(np.max(all_times)),
+            'std_execution_time_ms': float(np.std(all_times))
+        }
+        
+        return fp_rate, total_false_positives, timing_metrics
     
     @staticmethod
     def _propagate_messages(
         system: IdSystem,
-        message_set: List[List[int]]
+        message_set: List[List[int]],
+        num_validation_messages: int = 1
     ) -> Tuple[float, int, Dict[str, float]]:
         """Pick first message as message at sender and cycle through the rest of the messages at the receiver while timing the process."""
         n = len(message_set)
@@ -123,12 +240,12 @@ class IdMetrics:
         # Send the first message to get the codeword
         codeword = system.send(first_message)
 
-        for i in range(1, n):
+        for i in range(1, n, num_validation_messages):
             # Time the verification operation
             start_time = time.perf_counter()
 
-            if system.receive(codeword, message_set[i]):
-                false_positives += 1
+            if system.receive_k(codeword, message_set[i:i + num_validation_messages]):
+                false_positives += num_validation_messages
 
             end_time = time.perf_counter()
             execution_time_ms = (end_time - start_time) * 1000
@@ -141,7 +258,7 @@ class IdMetrics:
                 'std_execution_time_ms': 0.0
             }
         # Calculate false positive rate
-        fp_rate = false_positives / (n - 1)
+        fp_rate = false_positives / (n - 1) 
         # Calculate timing metrics
         timing_metrics = {
             'avg_execution_time_ms': float(np.mean(times)),
@@ -227,16 +344,18 @@ class IdMetrics:
         systems: Dict[str, IdSystem], 
         num_messages: int = 1000, 
         vec_len: int = 16,
-        message_subset_size: int = 10
+        message_subset_size: int = 10,
+        num_processes: int = None
     ) -> Dict[str, Dict[str, float]]:
         """
         Compare multiple identification systems.
         
         Args:
             systems: Dictionary mapping system names to IdSystem instances
-            message_set: List of messages to test
-            num_trials: Number of trials for reliability testing
-            timing_iterations: Number of iterations for timing measurements
+            num_messages: Number of messages to test
+            vec_len: Vector length in bytes
+            message_subset_size: Size of message subset for compute intensive metrics
+            num_processes: Number of processes to use for parallelization
             
         Returns:
             Dictionary mapping system names to their comprehensive metrics
@@ -246,7 +365,8 @@ class IdMetrics:
         for name, system in systems.items():
             print(f"Evaluating {name}...")
             results[name] = IdMetrics.evaluate_system(
-                system, num_messages, vec_len, message_subset_size
+                system, num_messages, vec_len, message_subset_size=message_subset_size,
+                num_processes=num_processes
             )
         
         return results

@@ -41,6 +41,19 @@ class IdSystem:
 
     def receive(self, codeword: Any, message: Any) -> bool:
         return self.verifier.verify(codeword, message)
+    
+    def receive_k(self, codeword: Any, messages: List[Any]) -> bool:
+        """
+        Verify multiple messages against a single codeword.
+        
+        Args:
+            codeword: The codeword to verify against
+            messages: List of messages to verify
+            
+        Returns:
+            True if at least one message verifies against the codeword, False otherwise
+        """
+        return any(self.verifier.verify(codeword, msg) for msg in messages)
 
 
 def _get_idcodes_instance(gf_exp: int):
@@ -63,7 +76,7 @@ class RSIDEncoder(IdEncoder):
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         default_params = {
             "gf_exp": 8,
-            "tag_pos": 2
+            "tag_pos": [2]
         }
         super().__init__(default_params)
         if parameters:
@@ -83,10 +96,11 @@ class RSIDEncoder(IdEncoder):
         super().set_parameters(parameters)
         self._init_idcodes()
     
-    def encode(self, message: List[int]) -> int:
-        tag_pos = self.parameters["tag_pos"]
-        result = self.idcodes.rsid(message, tag_pos, self.exp_arr, self.log_arr, self.gf_exp)
-        return result
+    def encode(self, message: List[int]) -> List[int]:
+        tags = []
+        for tag_pos in self.parameters["tag_pos"]:
+            tags.append(self.idcodes.rsid(message, tag_pos, self.exp_arr, self.log_arr, self.gf_exp))
+        return tags
 
 
 class RSIDVerifier(IdVerifier):
@@ -100,11 +114,11 @@ class RSIDVerifier(IdVerifier):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def verify(self, codeword: int, message: List[int]) -> bool:
-        recomputed_tag = self.encoder.encode(message)
-        return recomputed_tag == codeword
+    def verify(self, codewords: List[int], message: List[int]) -> bool:
+        recomputed_tags = self.encoder.encode(message)
+        return all(tag == codewords[i] for i, tag in enumerate(recomputed_tags))
 
-
+# WARNING: Still old version with only one tag
 class RS2IDEncoder(IdEncoder):
     """Concatenated Reed-Solomon Identification encoder using idcodes library."""
     
@@ -172,7 +186,7 @@ class RMIDEncoder(IdEncoder):
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         default_params = {
             "gf_exp": 8,
-            "tag_pos": 2,
+            "tag_pos": [2],
             "rm_order": 1
         }
         super().__init__(default_params)
@@ -193,12 +207,13 @@ class RMIDEncoder(IdEncoder):
         super().set_parameters(parameters)
         self._init_idcodes()
     
-    def encode(self, message: List[int]) -> int:
-        tag_pos = self.parameters["tag_pos"]
+    def encode(self, message: List[int]) -> List[int]:
         rm_order = self.parameters["rm_order"]
+        tags = []
         
-        result = self.idcodes.rmid(message, tag_pos, rm_order, self.exp_arr, self.log_arr, self.gf_exp)
-        return result
+        for tag_pos in self.parameters["tag_pos"]:
+            tags.append(self.idcodes.rmid(message, tag_pos, rm_order, self.exp_arr, self.log_arr, self.gf_exp))
+        return tags
 
 
 class RMIDVerifier(IdVerifier):
@@ -212,9 +227,9 @@ class RMIDVerifier(IdVerifier):
         super().set_parameters(parameters)
         self.encoder.set_parameters(parameters)
     
-    def verify(self, codeword: int, message: List[int]) -> bool:
-        recomputed_tag = self.encoder.encode(message)
-        return recomputed_tag == codeword
+    def verify(self, codewords: List[int], message: List[int]) -> bool:
+        recomputed_tags = self.encoder.encode(message)
+        return all(tag == codewords[i] for i, tag in enumerate(recomputed_tags))
 
 
 class SHA1IDEncoder(IdEncoder):
