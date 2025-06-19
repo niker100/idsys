@@ -1,16 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-# Load the data
-data = pd.DataFrame({
-    "datum": [
-        "2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05",
-        "2024-01-06", "2024-01-07", "2024-01-08", "2024-01-09", "2024-01-10"
-    ],
-    "kategorie": ["A", "B", "A", "C", "B", "A", "C", "A", "B", "C"],
-    "region": ["Nord", "Süd", "Nord", "Ost", "Süd", "West", "Ost", "Nord", "West", "Süd"],
-    "umsatz": [100, 150, 120, 130, 170, 90, 160, 110, 180, 140]
-})
+# 📂 Load data from CSV
+data = pd.read_csv("metriken.csv", parse_dates=["datum"])
 
 # 🔧 Expand dashboard to full width
 st.set_page_config(layout="wide")
