@@ -13,31 +13,72 @@ import math
 import multiprocessing as mp
 from typing import Dict, List, Tuple
 from collections import Counter
+from tqdm import tqdm
 
-from .core import IdSystem, generate_test_messages, create_id_system
+from .core import IdSystem, generate_test_messages, create_id_system, _get_idcodes_instance
 
 
-def _worker_propagate_messages(args):
-    """Worker function for parallel message propagation."""
-    system_type, system_params, codeword, message_batch, batch_start_idx, num_validation_messages = args
+def _worker_generate_and_test(args):
+    """Worker function for generating messages on-demand and testing."""
+    system_type, system_params, codeword, vec_len, gf_exp, batch_size, num_validation_messages, progress_dict, update_frequency = args
     
-    # Recreate the system in the worker process to avoid pickling issues
+    # Recreate the system in the worker process
     system = create_id_system(system_type, system_params)
+    
+    # Get idcodes instance for message generation
+    idcodes_instance = _get_idcodes_instance(gf_exp)
     
     false_positives = 0
     times = []
     
-    for i in range(0, len(message_batch), num_validation_messages):
+    # Calculate adjusted vector length
+    if gf_exp >= 33:
+        vec_len_ = vec_len // 8
+    elif gf_exp >= 17:
+        vec_len_ = vec_len // 4
+    elif gf_exp >= 9:
+        vec_len_ = vec_len // 2
+    else:
+        vec_len_ = vec_len
+    
+    # For tracking progress with minimal updates
+    local_progress = 0
+    progress_update_threshold = max(1, min(update_frequency, batch_size // 10))  # Update at most ~10 times per batch
+    worker_id = mp.current_process().pid
+    
+    # Process in mini-batches to save memory while reducing C++ call overhead
+    for batch_start in range(0, batch_size, num_validation_messages):
+        # Generate validation messages directly
+        validation_msgs = []
+        for _ in range(min(num_validation_messages, batch_size - batch_start)):
+            msg = idcodes_instance.generate_string_sequence(vec_len_)
+            validation_msgs.append(msg)
+            
         # Time the verification operation
         start_time = time.perf_counter()
         
-        validation_msgs = message_batch[i:i + num_validation_messages]
         if system.receive_k(codeword, validation_msgs):
             false_positives += len(validation_msgs)
         
         end_time = time.perf_counter()
         execution_time_ms = (end_time - start_time) * 1000
         times.append(execution_time_ms)
+        
+        # Explicitly clear messages to free memory
+        validation_msgs.clear()
+        
+        # Update local progress counter
+        messages_processed = min(num_validation_messages, batch_size - batch_start)
+        local_progress += messages_processed
+        
+        # Update shared progress counter infrequently to reduce overhead
+        if progress_dict is not None and (local_progress >= progress_update_threshold or batch_start + num_validation_messages >= batch_size):
+            progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
+            local_progress = 0
+    
+    # Ensure any remaining progress is reported
+    if progress_dict is not None and local_progress > 0:
+        progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
     
     return false_positives, times
 
@@ -77,17 +118,22 @@ class IdMetrics:
         gf_exp = params.get('gf_exp', 8)
         system_type = type(encoder).__name__.replace('Encoder', '')
 
-        message_set = generate_test_messages(vec_len, gf_exp, num_messages)
-        
-        # Calculate message length statistics
-        message_lengths = [len(msg) for msg in message_set]
-        avg_message_length = np.mean(message_lengths)
+        # Calculate approximate message length for code rate
+        # Use adjusted length calculation similar to generate_test_messages
+        if gf_exp >= 33:
+            message_length = vec_len // 8
+        elif gf_exp >= 17:
+            message_length = vec_len // 4
+        elif gf_exp >= 9:
+            message_length = vec_len // 2
+        else:
+            message_length = vec_len
         
         # Calculate code rate
-        code_rate = IdMetrics._calculate_code_rate(system_type, avg_message_length, gf_exp)
+        code_rate = IdMetrics._calculate_code_rate(system_type, message_length, gf_exp)
 
         fp_rate, false_positives, timing_metrics = IdMetrics._propagate_messages_parallel(
-            system, message_set, num_validation_messages, num_processes
+            system, vec_len, num_messages, num_validation_messages, num_processes
         )
 
         # Calculate entropy metrics
@@ -119,8 +165,7 @@ class IdMetrics:
             
             # System characteristics
             'tag_size_bits': float(gf_exp),
-            'avg_message_length': avg_message_length,
-            'message_length_std': np.std(message_lengths),
+            'avg_message_length': message_length,
             # 'unique_tags': tag_metrics['unique_tags'],
             # 'tag_uniqueness': tag_metrics['tag_uniqueness'],
             # 'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity'],
@@ -146,60 +191,139 @@ class IdMetrics:
     @staticmethod
     def _propagate_messages_parallel(
         system: IdSystem,
-        message_set: List[List[int]],
+        vec_len: int,
+        num_messages: int,
         num_validation_messages: int = 1,
         num_processes: int = None
     ) -> Tuple[float, int, Dict[str, float]]:
-        """Parallelized version of _propagate_messages."""
-        n = len(message_set)
-        if n < 2:
-            raise ValueError("Message set must contain at least two distinct messages for meaningful evaluation.")
+        """Memory-optimized parallelized version that generates messages on demand."""
+        if num_messages < 2:
+            raise ValueError("Need at least two messages for meaningful evaluation.")
         
-        # Use the first message as the one to receive
-        first_message = message_set[0]
-        remaining_messages = message_set[1:]
+        # Generate only the first message
+        encoder = system.encoder
+        params = getattr(encoder, 'parameters', {})
+        gf_exp = params.get('gf_exp', 8)
+        
+        # Get first message for codeword generation
+        idcodes = _get_idcodes_instance(gf_exp)
+        
+        # Calculate adjusted vector length as in generate_test_messages
+        if gf_exp >= 33:
+            vec_len_ = vec_len // 8
+        elif gf_exp >= 17:
+            vec_len_ = vec_len // 4
+        elif gf_exp >= 9:
+            vec_len_ = vec_len // 2
+        else:
+            vec_len_ = vec_len
+        
+        # Generate just one message
+        first_message = idcodes.generate_string_sequence(vec_len_)
         
         # Send the first message to get the codeword
         codeword = system.send(first_message)
         
         # Set number of processes
         if num_processes is None:
-            num_processes = min(mp.cpu_count(), len(remaining_messages) // 100 + 1)
+            num_processes = min(mp.cpu_count(), (num_messages - 1) // 1000 + 1)
         
-        # Split remaining messages into chunks for parallel processing
-        chunk_size = max(1, len(remaining_messages) // num_processes)
-        message_chunks = [
-            remaining_messages[i:i + chunk_size] 
-            for i in range(0, len(remaining_messages), chunk_size)
-        ]
+        # Calculate batch size per worker process
+        remaining_messages = num_messages - 1
+        batch_size_per_process = remaining_messages // num_processes
         
         # Get system info for recreation in worker processes
         system_type, system_params = IdMetrics._get_system_info(system)
         
-        # Prepare arguments for worker processes
-        worker_args = [
-            (system_type, system_params, codeword, chunk, i * chunk_size, num_validation_messages)
-            for i, chunk in enumerate(message_chunks)
-        ]
+        # Create a manager to share progress information between processes
+        manager = mp.Manager()
+        progress_dict = manager.dict()
         
-        # Process chunks in parallel
+        # Determine update frequency - higher for larger batches to minimize overhead
+        # Update roughly every ~1% of total messages or at least every 5000 messages
+        update_frequency = max(5000, remaining_messages // 100)
+        
+        # Prepare arguments for worker processes
+        worker_args = []
+        for i in range(num_processes):
+            # Last process gets remainder
+            actual_batch_size = batch_size_per_process + (remaining_messages % num_processes if i == num_processes-1 else 0)
+            worker_args.append((
+                system_type, 
+                system_params, 
+                codeword, 
+                vec_len, 
+                gf_exp, 
+                actual_batch_size, 
+                num_validation_messages,
+                progress_dict,  # Pass the shared progress dictionary
+                update_frequency  # Update frequency parameter
+            ))
+        
         total_false_positives = 0
         all_times = []
         
-        if num_processes == 1 or len(message_chunks) == 1:
-            # Single process execution for small datasets or when requested
-            for args in worker_args:
-                fp, times = _worker_propagate_messages(args)
-                total_false_positives += fp
-                all_times.extend(times)
-        else:
-            # Multi-process execution
-            with mp.Pool(processes=num_processes) as pool:
-                results = pool.map(_worker_propagate_messages, worker_args)
+        # Single process is simpler, use direct progress bar
+        if num_processes == 1:
+            fp, times = 0, []
+            with tqdm(total=num_messages-1, desc=f"Processing {num_messages} messages (1 proc)") as pbar:
+                for args in worker_args:
+                    _fp, _times = _worker_generate_and_test(args)
+                    fp += _fp
+                    times.extend(_times)
+                    pbar.update(args[5])  # Update by batch size
             
-            for fp, times in results:
-                total_false_positives += fp
-                all_times.extend(times)
+            total_false_positives = fp
+            all_times = times
+            
+        else:
+            # Multi-process with progress monitoring
+            desc = f"Processing {num_messages} messages ({num_processes} proc)"
+            
+            # Start the pool
+            pool = mp.Pool(processes=num_processes)
+            
+            # Submit all jobs
+            jobs = [pool.apply_async(_worker_generate_and_test, (args,)) for args in worker_args]
+            
+            # Monitor progress while jobs are running
+            # Calculate sleep time based on expected total runtime
+            # For short runs (<1M messages), check more frequently
+            sleep_time = 0.5 if num_messages < 1000000 else 1.0
+            
+            with tqdm(total=num_messages-1, desc=desc) as pbar:
+                # Track the last reported count
+                last_total = 0
+                
+                # Continue until all jobs complete
+                while any(not job.ready() for job in jobs):
+                    # Calculate current progress
+                    current_total = sum(progress_dict.values())
+                    
+                    # Update progress bar with the difference
+                    if current_total > last_total:
+                        pbar.update(current_total - last_total)
+                        last_total = current_total
+                    
+                    time.sleep(sleep_time)  # Reduced check frequency
+                
+                # Get all results
+                for job in jobs:
+                    fp, times = job.get()
+                    total_false_positives += fp
+                    all_times.extend(times)
+                
+                # Final update to ensure bar reaches 100%
+                current_total = sum(progress_dict.values())
+                if current_total > last_total:
+                    pbar.update(current_total - last_total)
+            
+            # Close and join the pool
+            pool.close()
+            pool.join()
+            
+            # Clean up the manager
+            manager.shutdown()
         
         if not all_times:
             return 0.0, total_false_positives, {
@@ -210,7 +334,7 @@ class IdMetrics:
             }
         
         # Calculate false positive rate
-        fp_rate = total_false_positives / (n - 1) 
+        fp_rate = total_false_positives / (num_messages - 1) 
         
         # Calculate timing metrics
         timing_metrics = {
