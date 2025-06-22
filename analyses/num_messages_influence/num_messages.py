@@ -20,14 +20,14 @@ def main():
 
     # Range of vec_length values to test
     #num_messages = [10, 50, 100, 500, 1000, 5000, 10000]
-    num_messages = np.arange(50000, 1000001, 50000, dtype=int).tolist()  # From 50000 to 1000000 in steps of 5000
-    vec_len = 125  # Fixed vector length for this test
+    num_messages = np.arange(500000, 10000001, 500000, dtype=int).tolist()  # From 50000 to 1000000 in steps of 5000
+    vec_len = 2  # Fixed vector length for this test
     gf_exp = 8  # Galois Field exponent for the systems
 
     # Create systems as a dictionary for compare_systems
     systems = {
-        'RSID': create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": 2}),
-        'RMID': create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": 2, "rm_order": 1}),
+        'RSID': create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]}),
+        'RMID': create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2], "rm_order": 1}),
         'SHA1ID': create_id_system("SHA1ID", {"gf_exp": gf_exp})
     }
 

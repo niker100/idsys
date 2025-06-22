@@ -13,38 +13,41 @@ def main():
     print("=" * 60)
 
     # Parameters
-    vec_lengths = [2**i for i in range(1, 16)]
+    vec_lengths = [2**i for i in range(1, 23, 3)]
     gf_exp_values = [8, 16, 32, 64]
     system_types = [
-        ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": 2})),
-        ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": 2})),
+        ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]})),
+        ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2]})),
         ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": 2, "tag_pos_in": 2})),
         ("SHA1ID", lambda gf_exp: lambda vec_len: create_id_system("SHA1ID", {"gf_exp": gf_exp})),
         ("SHA256ID", lambda gf_exp: lambda vec_len: create_id_system("SHA256ID", {"gf_exp": gf_exp})),
     ]
 
-    num_messages = 5000
+    base_num_messages = 100000
     # For each system, collect execution time for all gf_exp and vec_lengths
     for system_name, sys_factory in system_types:
         print(f"\nSystem: {system_name}")
         plt.figure(figsize=(12, 7))
         for gf_exp in gf_exp_values:
-            exec_times = []
+            if system_name == "RS2ID" and gf_exp > 32:
+                continue
+            exec_times = []            
             for vec_len in vec_lengths:
                 print(f"  gf_exp={gf_exp}, vec_len={vec_len} ...", end="", flush=True)
-                # messages = generate_test_messages(vec_len=vec_len, gf_exp=gf_exp, count=100)
+                num_messages = max(100, min(100 * base_num_messages // vec_len, base_num_messages))
                 system = sys_factory(gf_exp)(vec_len)
                 metrics = IdMetrics.evaluate_system(
                     system=system,
                     vec_len=vec_len,
                     num_messages=num_messages,
-                    message_subset_size=10
+                    message_subset_size=10,
+                    num_processes= 1,
                 )
                 exec_times.append(metrics["avg_execution_time_ms"])
                 print(f" {metrics['avg_execution_time_ms']:.3f} ms")
             plt.plot(vec_lengths, exec_times, marker='o', label=f"GF_EXP={gf_exp}")
 
-        plt.title(f"Execution Time vs Vector Length for {system_name} - {num_messages} Messages", fontsize=15, fontweight='bold')
+        plt.title(f"Execution Time vs Vector Length for {system_name} - {base_num_messages} Messages", fontsize=15, fontweight='bold')
         plt.xlabel("Vector Length", fontsize=13)
         plt.ylabel("Avg Execution Time (ms)", fontsize=13)
         plt.xscale("log", base=2)
