@@ -5,3 +5,4 @@ reedsolo
 pytest
 pandas
 psutils
+tqdm
