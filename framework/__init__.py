@@ -24,6 +24,11 @@ from .utils import (
     batch_evaluate_parameters
 )
 
+from .checkpoint import (
+    AnalysisCheckpoint,
+    create_checkpoint_manager
+)
+
 __all__ = [
     # Core classes
     'IdEncoder', 'IdVerifier', 'IdSystem',
@@ -47,5 +52,13 @@ __all__ = [
     'IdMetrics',
     
     # Utilities
-    'batch_evaluate_parameters'
+    'batch_evaluate_parameters',
+    
+    # Checkpointing
+    'AnalysisCheckpoint',
+    'create_checkpoint_manager',
+    
+    # Checkpointing
+    'AnalysisCheckpoint',
+    'create_checkpoint_manager'
 ]
