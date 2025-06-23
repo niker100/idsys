@@ -26,8 +26,8 @@ def main():
 
     # Create systems as a dictionary for compare_systems
     system_types = [
-        ("RSID", lambda gf_exp: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": 2})),
-        ("RMID", lambda gf_exp: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": 2})),
+        ("RSID", lambda gf_exp: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]})),
+        ("RMID", lambda gf_exp: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2]})),
         ("SHA1ID", lambda gf_exp: create_id_system("SHA1ID", {"gf_exp": gf_exp}))
     ]
 

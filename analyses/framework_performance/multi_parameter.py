@@ -16,9 +16,9 @@ def main():
     vec_lengths = [2**i for i in range(1, 16)]
     gf_exp_values = [8, 16, 32, 64]
     system_types = [
-        ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": 2})),
-        ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": 2})),
-        ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": 2, "tag_pos_in": 2})),
+        ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]})),
+        ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2]})),
+        ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": [2], "tag_pos_in": 2})),
         ("SHA1ID", lambda gf_exp: lambda vec_len: create_id_system("SHA1ID", {"gf_exp": gf_exp})),
         ("SHA256ID", lambda gf_exp: lambda vec_len: create_id_system("SHA256ID", {"gf_exp": gf_exp})),
     ]
