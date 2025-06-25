@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Corrected analysis comparing collision behavior between random and structured messages.
-Fixes the false positive counting logic.
+analysis comparing collision behavior between random and structured messages
 """
 
 import sys
@@ -34,7 +33,6 @@ def generate_structured_messages(vec_len: int, pattern_type: str, gf_exp: int, t
             unique_messages.add(msg)
 
     elif pattern_type == "repeated_patterns":
-        # Generate more unique repeated patterns by varying pattern, shift, and offset
         patterns = [[0xAA, 0xBB], [0xFF, 0x00], [0x12, 0x34], [0xCA, 0xFE]]
         for i in range(target_count * 10):
             pattern_idx = i % len(patterns)
@@ -121,9 +119,9 @@ def analyze_system(system_name: str, messages: List[List[int]], gf_exp: int = 16
 
 
 def run_analysis():
-    """Run the corrected analysis."""
+    """Run the analysis."""
     print("=" * 70)
-    print("CORRECTED IDENTIFICATION SYSTEM COLLISION ANALYSIS")
+    print("IDENTIFICATION SYSTEM COLLISION ANALYSIS")
     print("=" * 70)
     
     vec_len = 16
@@ -155,3 +153,44 @@ def run_analysis():
 
 if __name__ == "__main__":
     run_analysis()
+
+
+# OUTPUT:
+# ======================================================================
+# IDENTIFICATION SYSTEM COLLISION ANALYSIS
+# ======================================================================
+
+# RANDOM MESSAGES:
+# ----------------------------------------
+# Generated 10000 messages (10000 unique)
+# raw         :  745 false positives, 9255 unique tags
+# reed_solomon:  702 false positives, 9298 unique tags
+# sha1        :  769 false positives, 9231 unique tags
+
+# INCREMENTAL MESSAGES:
+# ----------------------------------------
+# Generated 10000 messages (10000 unique)
+# raw         : 9999 false positives,    1 unique tags
+# reed_solomon:    0 false positives, 10000 unique tags
+# sha1        :  779 false positives, 9221 unique tags
+
+# REPEATED_PATTERNS MESSAGES:
+# ----------------------------------------
+# Generated 113 messages (113 unique)
+# raw         :  105 false positives,    8 unique tags
+# reed_solomon:    0 false positives,  113 unique tags
+# sha1        :    0 false positives,  113 unique tags
+
+# SPARSE MESSAGES:
+# ----------------------------------------
+# Generated 10000 messages (10000 unique)
+# raw         : 8749 false positives, 1251 unique tags
+# reed_solomon:  695 false positives, 9305 unique tags
+# sha1        :  712 false positives, 9288 unique tags
+
+# LOW_ENTROPY MESSAGES:
+# ----------------------------------------
+# Generated 10000 messages (10000 unique)
+# raw         : 9996 false positives,    4 unique tags
+# reed_solomon:  710 false positives, 9290 unique tags
+# sha1        :  745 false positives, 9255 unique tags
