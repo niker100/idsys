@@ -5,3 +5,5 @@ reedsolo
 pytest
 pandas
 psutils
+streamlit
+altair
