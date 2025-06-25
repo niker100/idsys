@@ -30,6 +30,7 @@ def _worker_generate_and_test(args):
     
     false_positives = 0
     times = []
+    collided_msgs = []
     
     # Calculate adjusted vector length
     if gf_exp >= 33:
@@ -57,8 +58,10 @@ def _worker_generate_and_test(args):
         # Time the verification operation
         start_time = time.perf_counter()
         
-        if system.receive_k(codeword, validation_msgs):
+        collided_message = system.receive_k(codeword, validation_msgs)
+        if collided_message:
             false_positives += len(validation_msgs)
+            collided_msgs.append(collided_message)
         
         end_time = time.perf_counter()
         execution_time_ms = (end_time - start_time) * 1000
@@ -81,7 +84,7 @@ def _worker_generate_and_test(args):
     if show_progress and progress_dict is not None and local_progress > 0:
         progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
     
-    return false_positives, times
+    return false_positives, times, collided_msgs
 
 
 class IdMetrics:
@@ -135,7 +138,7 @@ class IdMetrics:
         # Calculate code rate
         code_rate = IdMetrics._calculate_code_rate(system_type, message_length, gf_exp)
 
-        fp_rate, false_positives, timing_metrics = IdMetrics._propagate_messages_parallel(
+        fp_rate, false_positives, timing_metrics, collision_metrics = IdMetrics._propagate_messages_parallel(
             system, vec_len, num_messages, num_validation_messages, num_processes, show_progress
         )
 
@@ -165,6 +168,11 @@ class IdMetrics:
             # 'message_entropy': entropy_metrics['message_entropy'],
             # 'tag_entropy': tag_metrics['tag_entropy'],
             # 'compression_ratio': entropy_metrics['message_entropy'] / tag_metrics['tag_entropy'] if tag_metrics['tag_entropy'] > 0 else 0,
+            'num_collisions': collision_metrics['num_collisions'],
+            'avg_hamming_distance': collision_metrics['avg_hamming_distance'],
+            'min_hamming_distance': collision_metrics['min_hamming_distance'],
+            'max_hamming_distance': collision_metrics['max_hamming_distance'],
+            'std_hamming_distance': collision_metrics['std_hamming_distance'],
             
             # System characteristics
             'tag_size_bits': float(gf_exp),
@@ -270,6 +278,7 @@ class IdMetrics:
         
         total_false_positives = 0
         all_times = []
+        collided_msgs = []
         
         # Single process is simpler, use direct progress bar
         if num_processes == 1:
@@ -283,9 +292,10 @@ class IdMetrics:
                         pbar.update(args[5])  # Update by batch size
             else:
                 for args in worker_args:
-                    _fp, _times = _worker_generate_and_test(args)
+                    _fp, _times, _collided = _worker_generate_and_test(args)
                     fp += _fp
                     times.extend(_times)
+                    collided_msgs.extend(_collided)
             
             total_false_positives = fp
             all_times = times
@@ -324,9 +334,10 @@ class IdMetrics:
                     
                     # Get all results
                     for job in jobs:
-                        fp, times = job.get()
+                        fp, times, collided = job.get()
                         total_false_positives += fp
                         all_times.extend(times)
+                        collided_msgs.extend(collided)
                     
                     # Final update to ensure bar reaches 100%
                     current_total = sum(progress_dict.values())
@@ -335,9 +346,10 @@ class IdMetrics:
             else:
                 # No progress bar - just wait for completion
                 for job in jobs:
-                    fp, times = job.get()
+                    fp, times, collided = job.get()
                     total_false_positives += fp
                     all_times.extend(times)
+                    collided_msgs.extend(collided)
             
             # Close and join the pool
             pool.close()
@@ -357,6 +369,22 @@ class IdMetrics:
         
         # Calculate false positive rate
         fp_rate = total_false_positives / (num_messages - 1) 
+
+        hamming_distances = []
+        # Calculate Hamming distances for collided messages
+        if collided_msgs:
+            for msg in collided_msgs:
+                # Calculate Hamming distance from the first message
+                hamming_distance = sum(1 for a, b in zip(first_message, msg) if a != b)
+                hamming_distances.append(hamming_distance)
+
+        collision_metrics = {
+            'num_collisions': len(collided_msgs),
+            'avg_hamming_distance': float(np.mean(hamming_distances)) if hamming_distances else 0.0,
+            'min_hamming_distance': float(np.min(hamming_distances)) if hamming_distances else 0.0,
+            'max_hamming_distance': float(np.max(hamming_distances)) if hamming_distances else 0.0,
+            'std_hamming_distance': float(np.std(hamming_distances)) if hamming_distances else 0.0
+        }
         
         # Calculate timing metrics
         timing_metrics = {
@@ -366,7 +394,7 @@ class IdMetrics:
             'std_execution_time_ms': float(np.std(all_times))
         }
         
-        return fp_rate, total_false_positives, timing_metrics
+        return fp_rate, total_false_positives, timing_metrics, collision_metrics
     
     @staticmethod
     def _propagate_messages(

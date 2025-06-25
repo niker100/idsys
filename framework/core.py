@@ -53,7 +53,10 @@ class IdSystem:
         Returns:
             True if at least one message verifies against the codeword, False otherwise
         """
-        return any(self.verifier.verify(codeword, msg) for msg in messages)
+        for msg in messages:
+            if self.verifier.verify(codeword, msg):
+                return msg
+        return None
 
 
 def _get_idcodes_instance(gf_exp: int):
