@@ -6,3 +6,5 @@ pytest
 pandas
 psutils
 tqdm
+streamlit
+altair
