@@ -21,21 +21,24 @@ def run_analysis():
     print("IDENTIFICATION SYSTEM COLLISION ANALYSIS")
     print("=" * 70)
     
-    vec_len = 128
+    vec_len = 16
     gf_exp = 8
-    target_messages = 2**12
+    target_messages = 10**6
     
     patterns = ["random", "incremental", "repeated_patterns", "sparse", "low_entropy"]
     systems = {
         "raw": create_id_system("NoCode", {"gf_exp": gf_exp}),
         "reed_solomon": create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]}),
+        "rmid": create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2], "rm_order": 1}),
+        "rmid2": create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2], "rm_order": 2}),
         "sha1": create_id_system("SHA1ID", {"gf_exp": gf_exp})
     }
     
     all_results = {}
     
-    for pattern in patterns:
-        print("-" * 40)        
+    for pattern in patterns: 
+
+        print("="*40)
         
         pattern_results = []
         for [system_name, system] in systems.items():
@@ -44,13 +47,13 @@ def run_analysis():
                 message_pattern=pattern,
                 vec_len=vec_len,
                 num_messages=target_messages,
-                message_subset_size=target_messages,
                 show_progress=False
             )
             pattern_results.append(result)
             
-            print(f"{system_name:12}: {result['false_positives']:4d} false positives, "
-                  f"{result['unique_tags']:4d} unique tags with {result['total_messages']:4d} messages")
+            print(f"{system_name:12}: {result['false_positive_rate']:.6f} fpr, "
+                  f"{len(result['tag_pdf'].values()):4d} unique tags with {result['total_messages']:4d} messages and {result['num_unique_messages']} unique messages")
+            print(f"message set hamming distance: {result['avg_hamming_distance']:.2f}, collisions hamming distance: {result['collisions_avg_hamming_distance']:.2f}")
         
         all_results[pattern] = pattern_results
 
