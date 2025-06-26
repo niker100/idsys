@@ -14,78 +14,99 @@ import multiprocessing as mp
 from typing import Dict, List, Tuple
 from collections import Counter
 from tqdm import tqdm
+from contextlib import nullcontext
 
-from .core import IdSystem, generate_test_messages, create_id_system, _get_idcodes_instance
+from .core import IdSystem, generate_test_messages, create_id_system, generate_structured_messages
 
 
 def _worker_generate_and_test(args):
     """Worker function for generating messages on-demand and testing."""
-    system_type, system_params, codeword, vec_len, gf_exp, batch_size, num_validation_messages, progress_dict, update_frequency, show_progress = args
+    system_type, system_params, codeword, vec_len, gf_exp, batch_size, num_validation_messages, progress_dict, update_frequency, show_progress, message_pattern, worker_seed = args
     
     # Recreate the system in the worker process
     system = create_id_system(system_type, system_params)
     
-    # Get idcodes instance for message generation
-    idcodes_instance = _get_idcodes_instance(gf_exp)
-    
     false_positives = 0
     times = []
     collided_msgs = []
-    
-    # Calculate adjusted vector length
-    if gf_exp >= 33:
-        vec_len_ = vec_len // 8
-    elif gf_exp >= 17:
-        vec_len_ = vec_len // 4
-    elif gf_exp >= 9:
-        vec_len_ = vec_len // 2
-    else:
-        vec_len_ = vec_len
     
     # For tracking progress with minimal updates (only if progress bar is enabled)
     local_progress = 0
     progress_update_threshold = max(1, min(update_frequency, batch_size // 10)) if show_progress else batch_size
     worker_id = mp.current_process().pid
     
-    # Process in mini-batches to save memory while reducing C++ call overhead
-    for batch_start in range(0, batch_size, num_validation_messages):
-        # Generate validation messages directly
-        validation_msgs = []
-        for _ in range(min(num_validation_messages, batch_size - batch_start)):
-            msg = idcodes_instance.generate_string_sequence(vec_len_)
-            validation_msgs.append(msg)
+    # Create a generator for this worker's messages with unique seed
+    # Each worker gets a different starting point to avoid duplicates
+    message_generator = generate_structured_messages(vec_len, message_pattern, gf_exp, batch_size, False, 42, worker_seed)
+    
+    # # Skip ahead based on worker seed to ensure different messages per worker
+    # if worker_seed > 0:
+    #     for _ in range(worker_seed):
+    #         try:
+    #             next(message_generator)
+    #         except StopIteration:
+    #             break
+    
+    # Process messages as they're generated
+    messages_processed = 0
+    validation_batch = []
+    
+    for message in message_generator:            
+        validation_batch.append(message)
+        messages_processed += 1
+        
+        # Process when we have enough messages or reached the end
+        if len(validation_batch) >= num_validation_messages or messages_processed >= batch_size:
+            # Time the verification operation
+            start_time = time.perf_counter()
             
-        # Time the verification operation
+            collided_message = system.receive_k(codeword, validation_batch)
+            if collided_message:
+                false_positives += len(validation_batch)
+                collided_msgs.append(collided_message)
+            
+            end_time = time.perf_counter()
+            execution_time_ms = (end_time - start_time) * 1000
+            times.append(execution_time_ms)
+            
+            # Update progress if enabled - FIXED: Use actual batch size processed
+            if show_progress:
+                local_progress += len(validation_batch)
+                
+                # Update shared progress counter infrequently
+                if progress_dict is not None and (local_progress >= progress_update_threshold or messages_processed >= batch_size):
+                    with progress_dict.get_lock() if hasattr(progress_dict, 'get_lock') else nullcontext():
+                        progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
+                    local_progress = 0
+            
+            # Clear the batch to free memory
+            validation_batch.clear()
+        
+        # Break if we've processed enough messages
+        if messages_processed >= batch_size:
+            break
+    
+    # Process any remaining messages in the batch
+    if validation_batch:
         start_time = time.perf_counter()
-        
-        collided_message = system.receive_k(codeword, validation_msgs)
+        collided_message = system.receive_k(codeword, validation_batch)
         if collided_message:
-            false_positives += len(validation_msgs)
+            false_positives += len(validation_batch)
             collided_msgs.append(collided_message)
-        
         end_time = time.perf_counter()
         execution_time_ms = (end_time - start_time) * 1000
         times.append(execution_time_ms)
         
-        # Explicitly clear messages to free memory
-        validation_msgs.clear()
-        
-        # Update local progress counter (only if progress tracking is enabled)
-        if show_progress:
-            messages_processed = min(num_validation_messages, batch_size - batch_start)
-            local_progress += messages_processed
-            
-            # Update shared progress counter infrequently to reduce overhead
-            if progress_dict is not None and (local_progress >= progress_update_threshold or batch_start + num_validation_messages >= batch_size):
-                progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
-                local_progress = 0
+        # Update progress for remaining messages
+        if show_progress and progress_dict is not None:
+            local_progress += len(validation_batch)
     
-    # Ensure any remaining progress is reported (only if progress tracking is enabled)
+    # Ensure any remaining progress is reported
     if show_progress and progress_dict is not None and local_progress > 0:
-        progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
+        with progress_dict.get_lock() if hasattr(progress_dict, 'get_lock') else nullcontext():
+            progress_dict[worker_id] = progress_dict.get(worker_id, 0) + local_progress
     
-    return false_positives, times, collided_msgs
-
+    return false_positives, times, collided_msgs, messages_processed
 
 class IdMetrics:
     """Class for calculating various metrics for identification systems."""
@@ -99,7 +120,8 @@ class IdMetrics:
         save_interval: int = 1000,
         message_subset_size: int = 10,
         num_processes: int = None,
-        show_progress: bool = True
+        show_progress: bool = True,
+        message_pattern: str = 'random'
     ) -> Dict[str, float]:
         """
         Complete evaluation of an identification system.
@@ -125,7 +147,6 @@ class IdMetrics:
         system_type = type(encoder).__name__.replace('Encoder', '')
 
         # Calculate approximate message length for code rate
-        # Use adjusted length calculation similar to generate_test_messages
         if gf_exp >= 33:
             message_length = vec_len // 8
         elif gf_exp >= 17:
@@ -138,20 +159,19 @@ class IdMetrics:
         # Calculate code rate
         code_rate = IdMetrics._calculate_code_rate(system_type, message_length, gf_exp)
 
-        fp_rate, false_positives, timing_metrics, collision_metrics = IdMetrics._propagate_messages_parallel(
-            system, vec_len, num_messages, num_validation_messages, num_processes, show_progress
+        fp_rate, false_positives, timing_metrics, collision_metrics, total_messages = IdMetrics._propagate_messages_parallel(
+            system, vec_len, num_messages, num_validation_messages, num_processes, show_progress, message_pattern
         )
 
-        # Calculate entropy metrics
-        # entropy_metrics = IdMetrics._calculate_entropy_metrics(message_set[0:message_subset_size], gf_exp)
-        
         # Calculate tag distribution metrics
-        # tag_metrics = IdMetrics._calculate_tag_metrics(system, message_set[0:message_subset_size])
+        sample_messages = list(generate_structured_messages(vec_len, message_pattern, gf_exp, message_subset_size, False))
+        tag_metrics = IdMetrics._calculate_tag_metrics(system, sample_messages)
         
         # Compile comprehensive results
         results = {
             # Core performance metrics
-            'false_positive_rate': fp_rate,  # Mean collision probability
+            'total_messages': total_messages,
+            'false_positive_rate': fp_rate,
             'false_positives': false_positives,
             'code_rate': code_rate,
             
@@ -164,10 +184,7 @@ class IdMetrics:
             # Efficiency metrics
             'throughput_msgs_per_sec': 1000.0 / timing_metrics['avg_execution_time_ms'] if timing_metrics['avg_execution_time_ms'] > 0 else 0,
             
-            # Information theory metrics
-            # 'message_entropy': entropy_metrics['message_entropy'],
-            # 'tag_entropy': tag_metrics['tag_entropy'],
-            # 'compression_ratio': entropy_metrics['message_entropy'] / tag_metrics['tag_entropy'] if tag_metrics['tag_entropy'] > 0 else 0,
+            # Collision metrics
             'num_collisions': collision_metrics['num_collisions'],
             'avg_hamming_distance': collision_metrics['avg_hamming_distance'],
             'min_hamming_distance': collision_metrics['min_hamming_distance'],
@@ -177,10 +194,10 @@ class IdMetrics:
             # System characteristics
             'tag_size_bits': float(gf_exp),
             'avg_message_length': message_length,
-            # 'unique_tags': tag_metrics['unique_tags'],
-            # 'tag_uniqueness': tag_metrics['tag_uniqueness'],
-            # 'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity'],
-            # 'tag_max_value': tag_metrics['tag_max_value'],        
+            'unique_tags': tag_metrics['unique_tags'],
+            'tag_uniqueness': tag_metrics['tag_uniqueness'],
+            'tag_distribution_uniformity': tag_metrics['tag_distribution_uniformity'],
+            'tag_max_value': tag_metrics['tag_max_value'],
         }
         
         return results
@@ -188,7 +205,6 @@ class IdMetrics:
     @staticmethod
     def _calculate_code_rate(system_type: str, avg_message_length: float, gf_exp: int) -> float:
         """Calculate effective code rate defined as the ratio of message bits to tag/output bits."""
-        # tag size = gf_exp bits
         return avg_message_length * 8 / float(gf_exp)
     
     @staticmethod
@@ -206,8 +222,9 @@ class IdMetrics:
         num_messages: int,
         num_validation_messages: int = 1,
         num_processes: int = None,
-        show_progress: bool = True
-    ) -> Tuple[float, int, Dict[str, float]]:
+        show_progress: bool = True,
+        message_pattern: str = 'random'
+    ) -> Tuple[float, int, Dict[str, float], Dict[str, float], int]:
         """Memory-optimized parallelized version that generates messages on demand."""
         if num_messages < 2:
             raise ValueError("Need at least two messages for meaningful evaluation.")
@@ -217,21 +234,9 @@ class IdMetrics:
         params = getattr(encoder, 'parameters', {})
         gf_exp = params.get('gf_exp', 8)
         
-        # Get first message for codeword generation
-        idcodes = _get_idcodes_instance(gf_exp)
-        
-        # Calculate adjusted vector length as in generate_test_messages
-        if gf_exp >= 33:
-            vec_len_ = vec_len // 8
-        elif gf_exp >= 17:
-            vec_len_ = vec_len // 4
-        elif gf_exp >= 9:
-            vec_len_ = vec_len // 2
-        else:
-            vec_len_ = vec_len
-        
-        # Generate just one message
-        first_message = idcodes.generate_string_sequence(vec_len_)
+        # Generate just one message for the reference
+        first_message_gen = generate_structured_messages(vec_len, message_pattern, gf_exp, 1, True)
+        first_message = next(first_message_gen)
         
         # Send the first message to get the codeword
         codeword = system.send(first_message)
@@ -254,15 +259,17 @@ class IdMetrics:
             manager = mp.Manager()
             progress_dict = manager.dict()
         
-        # Determine update frequency - higher for larger batches to minimize overhead
-        # Update roughly every ~1% of total messages or at least every 5000 messages
-        update_frequency = max(5000, remaining_messages // 100) if show_progress else remaining_messages
+        # Determine update frequency
+        update_frequency = max(100, remaining_messages // 100) if show_progress else remaining_messages
         
         # Prepare arguments for worker processes
         worker_args = []
         for i in range(num_processes):
             # Last process gets remainder
             actual_batch_size = batch_size_per_process + (remaining_messages % num_processes if i == num_processes-1 else 0)
+            # Each worker gets a different seed to ensure different message sequences
+            worker_seed = i
+            
             worker_args.append((
                 system_type, 
                 system_params, 
@@ -271,91 +278,69 @@ class IdMetrics:
                 gf_exp, 
                 actual_batch_size, 
                 num_validation_messages,
-                progress_dict,  # Pass the shared progress dictionary (None if disabled)
-                update_frequency,  # Update frequency parameter
-                show_progress  # Whether to track progress
+                progress_dict,
+                update_frequency,
+                show_progress,
+                message_pattern,
+                worker_seed  # Add worker seed to ensure different messages
             ))
         
         total_false_positives = 0
         all_times = []
         collided_msgs = []
+        total_messages_processed = 1  # Start with 1 for the first message used for codeword
         
-        # Single process is simpler, use direct progress bar
-        if num_processes == 1:
-            fp, times = 0, []
-            if show_progress:
-                with tqdm(total=num_messages-1, desc=f"Processing {num_messages} messages (1 proc)") as pbar:
-                    for args in worker_args:
-                        _fp, _times = _worker_generate_and_test(args)
-                        fp += _fp
-                        times.extend(_times)
-                        pbar.update(args[5])  # Update by batch size
-            else:
-                for args in worker_args:
-                    _fp, _times, _collided = _worker_generate_and_test(args)
-                    fp += _fp
-                    times.extend(_times)
-                    collided_msgs.extend(_collided)
-            
-            total_false_positives = fp
-            all_times = times
-            
+        if num_processes == 1 or len(worker_args) == 1:
+            # Single process execution for small datasets or when requested
+            for args in worker_args:
+                fp, times, collided, processed = _worker_generate_and_test(args)
+                total_false_positives += fp
+                all_times.extend(times)
+                collided_msgs.extend(collided)
+                total_messages_processed += processed
         else:
-            # Multi-process with optional progress monitoring
-            desc = f"Processing {num_messages} messages ({num_processes} proc)"
-            
-            # Start the pool
-            pool = mp.Pool(processes=num_processes)
-            
-            # Submit all jobs
-            jobs = [pool.apply_async(_worker_generate_and_test, (args,)) for args in worker_args]
-            
-            if show_progress:
-                # Monitor progress while jobs are running
-                # Calculate sleep time based on expected total runtime
-                # For short runs (<1M messages), check more frequently
-                sleep_time = 0.5 if num_messages < 1000000 else 1.0
-                
-                with tqdm(total=num_messages-1, desc=desc) as pbar:
-                    # Track the last reported count
-                    last_total = 0
+            # Multi-process execution
+            with mp.Pool(processes=num_processes) as pool:
+                if show_progress:
+                    # Submit all jobs
+                    jobs = [pool.apply_async(_worker_generate_and_test, (args,)) for args in worker_args]
                     
-                    # Continue until all jobs complete
-                    while any(not job.ready() for job in jobs):
-                        # Calculate current progress
-                        current_total = sum(progress_dict.values())
+                    desc = f"Processing {num_messages} messages ({num_processes} proc)"
+                    sleep_time = 0.1 if num_messages < 10000 else 0.5
+                    
+                    with tqdm(total=num_messages-1, desc=desc) as pbar:
+                        last_total = 0
                         
-                        # Update progress bar with the difference
+                        # Monitor progress while jobs are running
+                        while any(not job.ready() for job in jobs):
+                            current_total = sum(progress_dict.values()) if progress_dict else 0
+                            if current_total > last_total:
+                                pbar.update(current_total - last_total)
+                                last_total = current_total
+                            time.sleep(sleep_time)
+                        
+                        # Get all results
+                        for job in jobs:
+                            fp, times, collided, processed = job.get()
+                            total_false_positives += fp
+                            all_times.extend(times)
+                            collided_msgs.extend(collided)
+                            total_messages_processed += processed
+                        
+                        # Final update
+                        current_total = sum(progress_dict.values()) if progress_dict else 0
                         if current_total > last_total:
                             pbar.update(current_total - last_total)
-                            last_total = current_total
-                        
-                        time.sleep(sleep_time)  # Reduced check frequency
-                    
-                    # Get all results
-                    for job in jobs:
-                        fp, times, collided = job.get()
+                else:
+                    # No progress bar - just map
+                    results = pool.map(_worker_generate_and_test, worker_args)
+                    for fp, times, collided, processed in results:
                         total_false_positives += fp
                         all_times.extend(times)
                         collided_msgs.extend(collided)
-                    
-                    # Final update to ensure bar reaches 100%
-                    current_total = sum(progress_dict.values())
-                    if current_total > last_total:
-                        pbar.update(current_total - last_total)
-            else:
-                # No progress bar - just wait for completion
-                for job in jobs:
-                    fp, times, collided = job.get()
-                    total_false_positives += fp
-                    all_times.extend(times)
-                    collided_msgs.extend(collided)
+                        total_messages_processed += processed
             
-            # Close and join the pool
-            pool.close()
-            pool.join()
-            
-            # Clean up the manager (only if it was created)
+            # Clean up the manager
             if manager is not None:
                 manager.shutdown()
         
@@ -365,16 +350,21 @@ class IdMetrics:
                 'min_execution_time_ms': 0.0,
                 'max_execution_time_ms': 0.0,
                 'std_execution_time_ms': 0.0
-            }
+            }, {
+                'num_collisions': 0,
+                'avg_hamming_distance': 0.0,
+                'min_hamming_distance': 0.0,
+                'max_hamming_distance': 0.0,
+                'std_hamming_distance': 0.0
+            }, total_messages_processed
         
-        # Calculate false positive rate
-        fp_rate = total_false_positives / (num_messages - 1) 
+        # Calculate false positive rate based on actual messages processed
+        fp_rate = total_false_positives / max(1, total_messages_processed - 1)
 
-        hamming_distances = []
         # Calculate Hamming distances for collided messages
+        hamming_distances = []
         if collided_msgs:
             for msg in collided_msgs:
-                # Calculate Hamming distance from the first message
                 hamming_distance = sum(1 for a, b in zip(first_message, msg) if a != b)
                 hamming_distances.append(hamming_distance)
 
@@ -394,8 +384,8 @@ class IdMetrics:
             'std_execution_time_ms': float(np.std(all_times))
         }
         
-        return fp_rate, total_false_positives, timing_metrics, collision_metrics
-    
+        return fp_rate, total_false_positives, timing_metrics, collision_metrics, total_messages_processed    
+
     @staticmethod
     def _propagate_messages(
         system: IdSystem,
@@ -472,8 +462,15 @@ class IdMetrics:
         tags = []
         
         for message in sample_messages:
+            if message == []:
+                break  # Stop if empty message is encountered
             tag = system.send(message)
-            tags.append(tag)
+            if isinstance(tag, list):
+                # Convert list tags to tuples for consistency
+                tags.append(tuple(tag))
+            else:
+                # For single value tags, just append the value
+                tags.append(tag)
         
         if not tags:
             return {
@@ -489,10 +486,10 @@ class IdMetrics:
         total_tags = len(tags)
         tag_entropy = 0.0
         
-        for count in tag_counts.values():
-            prob = count / total_tags
-            if prob > 0:
-                tag_entropy -= prob * math.log2(prob)
+        # for count in tag_counts.values():
+        #     prob = count / total_tags
+        #     if prob > 0:
+        #         tag_entropy -= prob * math.log2(prob)
         
         # Calculate uniqueness (fraction of unique tags)
         unique_tags = len(tag_counts) if total_tags > 0 else 0
@@ -501,7 +498,8 @@ class IdMetrics:
         # Calculate distribution uniformity (how close to uniform distribution)
         # This is the relative entropy compared to a uniform distribution
         # D(p_X || p_U) = log2(|χ|) - H(X) where X is the random variable, |χ| the size of the alphabet 
-        uniformity = math.log2(unique_tags) - tag_entropy if unique_tags > 0 else 0.0
+        # uniformity = math.log2(unique_tags) - tag_entropy if unique_tags > 0 else 0.0
+        uniformity = 0.0
 
         tag_max_value = max(tag_counts.keys()) if tag_counts else 0
         
@@ -519,7 +517,9 @@ class IdMetrics:
         num_messages: int = 1000, 
         vec_len: int = 16,
         message_subset_size: int = 10,
-        num_processes: int = None
+        num_processes: int = None,
+        message_pattern: str = 'random',
+        show_progress: bool = True
     ) -> Dict[str, Dict[str, float]]:
         """
         Compare multiple identification systems.
@@ -540,7 +540,8 @@ class IdMetrics:
             print(f"Evaluating {name}...")
             results[name] = IdMetrics.evaluate_system(
                 system, num_messages, vec_len, message_subset_size=message_subset_size,
-                num_processes=num_processes
+                num_processes=num_processes, show_progress=show_progress,
+                message_pattern=message_pattern
             )
         
         return results

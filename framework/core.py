@@ -5,8 +5,9 @@ Core module for identification systems using the idcodes library.
 This module provides the fundamental classes and functions for
 implementing and evaluating identification systems with multiple coding schemes.
 """
-from typing import List, Any, Optional, Dict
+from typing import List, Any, Optional, Dict, Set, Tuple
 from idcodes.idcodes import IDCODES_U8, IDCODES_U16, IDCODES_U32, IDCODES_U64
+import numpy as np
 
 
 class IdEncoder:
@@ -315,7 +316,46 @@ class SHA256IDVerifier(IdVerifier):
     def verify(self, codeword: int, message: List[int]) -> bool:
         recomputed_tag = self.encoder.encode(message)
         return recomputed_tag == codeword
+    
+class NoCodeEncoder(IdEncoder):
+    """No-code encoder that simply returns the first element of the message."""
 
+    def __init__(self, parameters: Optional[Dict[str, Any]] = None):
+        default_params = {
+            "gf_exp": 8
+        }
+        super().__init__(default_params)
+        if parameters:
+            self.set_parameters(parameters)
+        self._init_idcodes()
+    
+    def _init_idcodes(self):
+        self.gf_exp = self.parameters["gf_exp"]
+    
+    def set_parameters(self, parameters: Dict[str, Any]) -> None:
+        super().set_parameters(parameters)
+        self._init_idcodes()
+    
+    def encode(self, message: List[int]) -> int:
+        if not message:
+            raise ValueError("Message cannot be empty")
+        return message[0]
+
+class NoCodeVerifier(IdVerifier):
+    """No-code verifier that checks if the codeword matches the first element of the message."""
+
+    def __init__(self, parameters: Optional[Dict[str, Any]] = None):
+        super().__init__(parameters)
+        self.encoder = NoCodeEncoder(parameters)
+    
+    def set_parameters(self, parameters: Dict[str, Any]) -> None:
+        super().set_parameters(parameters)
+        self.encoder.set_parameters(parameters)
+    
+    def verify(self, codeword: int, message: List[int]) -> bool:
+        if not message:
+            raise ValueError("Message cannot be empty")
+        return codeword == message[0]
 
 def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, Any]] = None) -> IdSystem:
     """
@@ -332,7 +372,8 @@ def create_id_system(system_type: str = "RSID", parameters: Optional[Dict[str, A
         "RS2ID": (RS2IDEncoder, RS2IDVerifier),
         "RMID": (RMIDEncoder, RMIDVerifier),
         "SHA1ID": (SHA1IDEncoder, SHA1IDVerifier),
-        "SHA256ID": (SHA256IDEncoder, SHA256IDVerifier)
+        "SHA256ID": (SHA256IDEncoder, SHA256IDVerifier),
+        "NoCode": (NoCodeEncoder, NoCodeVerifier)
     }
     
     if system_type not in systems:
@@ -377,3 +418,126 @@ def generate_test_messages(vec_len: int, gf_exp: int, count: int = 1) -> List[Li
         messages.append(message)
     
     return messages
+
+def generate_structured_messages(
+    vec_len: int,
+    pattern_type: str,
+    gf_exp: int,
+    target_count: int = 5000,
+    generate_first: bool = False,
+    seed: Optional[int] = None,
+    worker_offset: int = 0
+):
+    """
+    Generator factory that produces messages with specified structural patterns.
+    
+    Args:
+        vec_len: Vector length in elements
+        pattern_type: Type of pattern to generate ('random', 'incremental', etc.)
+        gf_exp: Galois field exponent
+        target_count: Number of messages to generate
+        generate_first: Whether to yield the first message
+        seed: Random seed for reproducibility
+        worker_offset: Offset for multiprocessing (use worker's ID/index)
+    """
+    # Static variable to store the first message
+    if not hasattr(generate_structured_messages, "_first_message"):
+        generate_structured_messages._first_message = None
+    
+    # Use worker_offset to create process-specific randomness
+    # but keep global seed for reproducibility if provided
+    if seed is not None:
+        base_seed = seed
+    else:
+        # Use current time if no seed provided
+        import time
+        base_seed = int(time.time())
+    
+    # Create a process-specific random state
+    process_seed = base_seed + worker_offset
+    process_random = np.random.RandomState(process_seed)
+
+    # Helper to generate a single message for a given attempt
+    def _gen_pattern(attempt):
+        # Use process-specific attempt counter
+        effective_attempt = attempt + (worker_offset * 1000)  # Large offset to avoid overlaps
+        
+        if pattern_type == 'random':
+            Id = _get_idcodes_instance(gf_exp)
+            if gf_exp >= 33:
+                vec_len_ = vec_len // 8
+            elif gf_exp >= 17:
+                vec_len_ = vec_len // 4
+            elif gf_exp >= 9:
+                vec_len_ = vec_len // 2
+            else:
+                vec_len_ = vec_len
+            
+            # For random mode, seed the PRNG for each message
+            Id.set_seed(effective_attempt) if hasattr(Id, 'set_seed') else None
+            msg = Id.generate_string_sequence(vec_len_)
+            
+            # Add some process-specific randomization
+            if worker_offset > 0:
+                # Randomly perturb some elements to ensure uniqueness across processes
+                num_changes = max(1, int(vec_len_ * 0.1))  # Change ~10% of elements
+                for _ in range(num_changes):
+                    pos = process_random.randint(0, len(msg)-1)
+                    msg[pos] = process_random.randint(0, 2**gf_exp-1)
+            return msg
+            
+        elif pattern_type == "incremental":
+            return [0] * (vec_len - 1) + [effective_attempt % (2 ** gf_exp)]
+            
+        elif pattern_type == "repeated_patterns":
+            patterns = [[0xAA, 0xBB], [0xFF, 0x00], [0x12, 0x34], [0xCA, 0xFE]]
+            # Add some worker-specific patterns
+            if worker_offset > 0:
+                patterns.append([worker_offset % 256, (worker_offset * 2) % 256])
+            
+            pattern_idx = effective_attempt % len(patterns)
+            pattern = patterns[pattern_idx]
+            shift = (effective_attempt // len(patterns)) % len(pattern)
+            rotated = pattern[shift:] + pattern[:shift]
+            offset = (effective_attempt // (len(patterns) * len(pattern))) % vec_len
+            return (([0] * offset) + rotated * ((vec_len + len(rotated) - 1) // len(rotated)))[:vec_len]
+            
+        elif pattern_type == "sparse":
+            msg = [0] * vec_len
+            num_nonzero = 1 + (effective_attempt % 3)
+            # Use different prime numbers for each worker
+            prime_offset = [7, 11, 13, 17, 19, 23, 29, 31][worker_offset % 8]
+            positions = [(effective_attempt + j * prime_offset) % vec_len for j in range(num_nonzero)]
+            for pos in positions:
+                msg[pos] = 1 + (effective_attempt + pos) % (2 ** gf_exp - 1)
+            return msg
+            
+        elif pattern_type == "low_entropy":
+            # Use process-specific random state
+            alphabet = [0, 1, 2, 3]
+            return list(process_random.choice(alphabet, size=vec_len))
+        else:
+            raise ValueError(f"Unsupported pattern type: {pattern_type}")
+
+    # Generate and store/yield the first message if requested
+    if generate_first or generate_structured_messages._first_message is None:
+        # First message should be the same for all processes
+        first_message = _gen_pattern(0) if worker_offset == 0 else generate_structured_messages._first_message
+        generate_structured_messages._first_message = first_message
+        if generate_first:
+            yield first_message
+            return  # Only yield the first message if requested
+
+    first_message = generate_structured_messages._first_message
+
+    # Now generate messages, skipping any that match the first message
+    count = 0
+    attempts = 1  # Start from 1 to avoid duplicating the first message
+    max_attempts = target_count * 10  # Avoid infinite loops
+
+    while count < target_count and attempts < max_attempts:
+        msg = _gen_pattern(attempts)
+        attempts += 1
+        if msg != first_message:
+            yield msg
+            count += 1  # Fix: increment the counter
