@@ -18,6 +18,8 @@ import os
 # Add path to parent directory to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 from framework import IdMetrics, create_id_system
 from framework.checkpoint import create_checkpoint_manager
 
@@ -47,11 +49,15 @@ def create_parameter_sets():
     for gf_exp in gf_exp_values:
         for system_type in system_types:
             parameter_sets.append({
-                "gf_exp": gf_exp,
                 "system_type": system_type,
-                "num_messages": num_messages,
+                "gf_exp": gf_exp,
                 "vec_len": vec_len,
-                "message_subset_size": message_subset_size
+                "num_messages": num_messages,
+                "message_subset_size": message_subset_size,
+                "test_type": None,
+                "tag_pos": None,
+                "num_tags": None,
+                "num_validation_messages": None
             })
     
     return parameter_sets
@@ -78,26 +84,20 @@ def analyze_single_combination(params):
             "gf_exp": params["gf_exp"]
         })
     
-    # Create systems dictionary for compare_systems
-    systems = {params["system_type"]: system}
-    
-    # Run the evaluation
-    metrics = IdMetrics.compare_systems(
-        systems=systems,
-        num_messages=params["num_messages"],
+    # Use evaluate_system for a single system
+    results = IdMetrics.evaluate_system(
+        system=system,
         vec_len=params["vec_len"],
+        num_messages=params["num_messages"],
         message_subset_size=params["message_subset_size"]
     )
     
-    # Extract results for this system
-    system_metrics = metrics[params["system_type"]]
-    
     # Return results
     return {
-        "false_positives": system_metrics["false_positives"],
-        "avg_execution_time_ms": system_metrics["avg_execution_time_ms"],
-        "false_positive_rate": system_metrics["false_positive_rate"],
-        "reliability": system_metrics.get("reliability", 0)
+        "false_positives": results["false_positives"],
+        "avg_execution_time_ms": results["avg_execution_time_ms"],
+        "false_positive_rate": results["false_positive_rate"],
+        "reliability": results.get("reliability", 0)
     }
 
 
@@ -109,8 +109,9 @@ def run_gf_exp_analysis_with_checkpointing():
     print("=" * 60)
     
     # Create checkpoint manager
+    output_dir = os.path.join(SCRIPT_DIR, "checkpoints")
     checkpoint = create_checkpoint_manager(
-        output_dir="analyses/gf_exp_influence/checkpoints",
+        output_dir=output_dir,
         analysis_name="gf_exp_influence",
         save_interval=1  # Save after each parameter combination
     )

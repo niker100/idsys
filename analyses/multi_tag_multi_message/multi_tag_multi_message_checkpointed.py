@@ -20,6 +20,8 @@ import os
 # Add path to parent directory to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 from framework import IdMetrics, create_id_system
 from framework.checkpoint import create_checkpoint_manager
 
@@ -48,31 +50,43 @@ def create_parameter_sets():
     # Test 1: Multiple validation messages with single tag
     for num_validation_messages in nums_validation_messages:
         parameter_sets.append({
+            "system_type": ANALYSIS_CONFIG["system_type"],
+            "gf_exp": ANALYSIS_CONFIG["gf_exp"],
+            "vec_len": vec_len,
+            "num_messages": num_messages,
+            "message_subset_size": None,
             "test_type": "multi_validation_single_tag",
             "tag_pos": [2],
-            "num_validation_messages": num_validation_messages,
-            "vec_len": vec_len,
-            "num_messages": num_messages
+            "num_tags": 1,
+            "num_validation_messages": num_validation_messages
         })
     
     # Test 2: Multiple tags with single validation message
     for tag_pos in tag_positions:
         parameter_sets.append({
+            "system_type": ANALYSIS_CONFIG["system_type"],
+            "gf_exp": ANALYSIS_CONFIG["gf_exp"],
+            "vec_len": vec_len,
+            "num_messages": num_messages,
+            "message_subset_size": None,
             "test_type": "multi_tag_single_validation",
             "tag_pos": tag_pos,
-            "num_validation_messages": 1,
-            "vec_len": vec_len,
-            "num_messages": num_messages
+            "num_tags": len(tag_pos),
+            "num_validation_messages": 1
         })
     
     # Test 3: Combination of multiple tags and multiple validation messages
     for num_validation_messages in nums_validation_messages:
         parameter_sets.append({
-            "test_type": "multi_tag_multi_validation",
-            "tag_pos": [2, 3],  # Use 2-tag system for combination test
-            "num_validation_messages": num_validation_messages,
+            "system_type": ANALYSIS_CONFIG["system_type"],
+            "gf_exp": ANALYSIS_CONFIG["gf_exp"],
             "vec_len": vec_len,
-            "num_messages": num_messages
+            "num_messages": num_messages,
+            "message_subset_size": None,
+            "test_type": "multi_tag_multi_validation",
+            "tag_pos": [2, 3],
+            "num_tags": 2,
+            "num_validation_messages": num_validation_messages
         })
     
     return parameter_sets
@@ -133,8 +147,9 @@ def run_multi_tag_analysis_with_checkpointing():
     print("=" * 60)
     
     # Create checkpoint manager
+    output_dir = os.path.join(SCRIPT_DIR, "checkpoints")
     checkpoint = create_checkpoint_manager(
-        output_dir="analyses/multi_tag_multi_message/checkpoints",
+        output_dir=output_dir,
         analysis_name="multi_tag_multi_message",
         save_interval=1  # Save after each test combination
     )

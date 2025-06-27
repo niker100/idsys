@@ -18,6 +18,8 @@ import os
 # Add path to parent directory to import framework modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 from framework import IdMetrics, create_id_system
 from framework.checkpoint import create_checkpoint_manager
 
@@ -49,24 +51,27 @@ def create_parameter_sets():
     num_messages = ANALYSIS_CONFIG["num_messages"]
     message_subset_size = ANALYSIS_CONFIG["message_subset_size"]
     
-    # Generate all combinations of system_type, gf_exp, and vec_len
-    # Note: We don't include the factory function in the parameter set for serialization
+    # Consistent parameter set format for CSV comparability
     for system_name, sys_factory in system_types:
         for gf_exp in gf_exp_values:
             for vec_len in vec_lengths:
                 parameter_sets.append({
-                    "system_name": system_name,
+                    "system_type": system_name,
                     "gf_exp": gf_exp,
                     "vec_len": vec_len,
                     "num_messages": num_messages,
-                    "message_subset_size": message_subset_size
+                    "message_subset_size": message_subset_size,
+                    "test_type": None,
+                    "tag_pos": None,
+                    "num_tags": None,
+                    "num_validation_messages": None
                 })
     
     return parameter_sets
 
 
-def get_system_factory(system_name):
-    """Get the system factory function for a given system name."""
+def get_system_factory(system_type):
+    """Get the system factory function for a given system type."""
     system_factories = {
         "RSID": lambda gf_exp: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]}),
         "RMID": lambda gf_exp: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2]}),
@@ -74,7 +79,7 @@ def get_system_factory(system_name):
         "SHA1ID": lambda gf_exp: create_id_system("SHA1ID", {"gf_exp": gf_exp}),
         "SHA256ID": lambda gf_exp: create_id_system("SHA256ID", {"gf_exp": gf_exp}),
     }
-    return system_factories.get(system_name)
+    return system_factories.get(system_type)
 
 
 def analyze_single_combination(params):
@@ -88,9 +93,9 @@ def analyze_single_combination(params):
         Dictionary with analysis results
     """
     # Get the system factory function and create the system
-    system_factory = get_system_factory(params["system_name"])
+    system_factory = get_system_factory(params["system_type"])
     if system_factory is None:
-        raise ValueError(f"Unknown system type: {params['system_name']}")
+        raise ValueError(f"Unknown system type: {params['system_type']}")
     
     system = system_factory(params["gf_exp"])
     
@@ -121,8 +126,9 @@ def run_multi_parameter_analysis_with_checkpointing():
     print("=" * 70)
     
     # Create checkpoint manager
+    output_dir = os.path.join(SCRIPT_DIR, "checkpoints")
     checkpoint = create_checkpoint_manager(
-        output_dir="analyses/framework_performance/checkpoints",
+        output_dir=output_dir,
         analysis_name="multi_parameter_performance",
         save_interval=5  # Save every 5 parameter combinations
     )
@@ -151,7 +157,7 @@ def run_multi_parameter_analysis_with_checkpointing():
     
     # Process each parameter combination
     for i, params in enumerate(remaining_params):
-        test_desc = f"{params['system_name']}: gf_exp={params['gf_exp']}, vec_len={params['vec_len']}"
+        test_desc = f"{params['system_type']}: gf_exp={params['gf_exp']}, vec_len={params['vec_len']}"
         print(f"\n[{i+1}/{len(remaining_params)}] Testing: {test_desc}")
         
         try:
@@ -193,10 +199,10 @@ def print_detailed_results(results_df):
     print("="*70)
     
     # Group results by system type
-    for system_name in results_df['system_name'].unique():
-        system_data = results_df[results_df['system_name'] == system_name]
+    for system_type in results_df['system_type'].unique():
+        system_data = results_df[results_df['system_type'] == system_type]
         
-        print(f"\n{system_name}:")
+        print(f"\n{system_type}:")
         print("-" * 40)
         
         # Group by gf_exp
@@ -224,7 +230,7 @@ def create_analysis_summary(results_df):
     print("="*70)
     
     total_combinations = len(results_df)
-    num_systems = results_df['system_name'].nunique()
+    num_systems = results_df['system_type'].nunique()
     num_gf_exp = results_df['gf_exp'].nunique()
     num_vec_lengths = results_df['vec_len'].nunique()
     
@@ -233,7 +239,7 @@ def create_analysis_summary(results_df):
     print(f"Number of GF exponents: {num_gf_exp}")
     print(f"Number of vector lengths: {num_vec_lengths}")
     
-    print(f"\nSystem types tested: {sorted(results_df['system_name'].unique())}")
+    print(f"\nSystem types tested: {sorted(results_df['system_type'].unique())}")
     print(f"GF exponents tested: {sorted(results_df['gf_exp'].unique())}")
     print(f"Vector length range: {results_df['vec_len'].min()} - {results_df['vec_len'].max()}")
     
@@ -257,10 +263,10 @@ def create_analysis_summary(results_df):
     slowest = results_df.loc[slowest_idx]
     
     print(f"\nFastest combination:")
-    print(f"  {fastest['system_name']}, GF_EXP={fastest['gf_exp']}, vec_len={fastest['vec_len']}: {fastest['avg_execution_time_ms']:.3f} ms")
+    print(f"  {fastest['system_type']}, GF_EXP={fastest['gf_exp']}, vec_len={fastest['vec_len']}: {fastest['avg_execution_time_ms']:.3f} ms")
     
     print(f"\nSlowest combination:")
-    print(f"  {slowest['system_name']}, GF_EXP={slowest['gf_exp']}, vec_len={slowest['vec_len']}: {slowest['avg_execution_time_ms']:.3f} ms")
+    print(f"  {slowest['system_type']}, GF_EXP={slowest['gf_exp']}, vec_len={slowest['vec_len']}: {slowest['avg_execution_time_ms']:.3f} ms")
 
 
 if __name__ == "__main__":
