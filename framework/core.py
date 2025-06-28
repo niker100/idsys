@@ -93,8 +93,8 @@ class RSIDEncoder(IdEncoder):
         if self.gf_exp <= 16:
             self.idcodes.generate_gf_outer(self.gf_exp)
             
-        self.exp_arr = self.idcodes.get_exp_arr()
-        self.log_arr = self.idcodes.get_log_arr()
+        self.exp_arr = np.ascontiguousarray(self.idcodes.get_exp_arr())
+        self.log_arr = np.ascontiguousarray(self.idcodes.get_log_arr())
     
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
@@ -145,11 +145,12 @@ class RS2IDEncoder(IdEncoder):
             self.idcodes.generate_gf_inner(self.gf_exp)
         elif self.gf_exp <= 32:
             self.idcodes.generate_gf_inner(self.gf_exp // 2)
+    
         
-        self.exp_arr = self.idcodes.get_exp_arr()
-        self.log_arr = self.idcodes.get_log_arr()
-        self.exp_arr_in = self.idcodes.get_exp_arr_in()
-        self.log_arr_in = self.idcodes.get_log_arr_in()
+        self.exp_arr = np.ascontiguousarray(self.idcodes.get_exp_arr())
+        self.log_arr = np.ascontiguousarray(self.idcodes.get_log_arr())
+        self.exp_arr_in = np.ascontiguousarray(self.idcodes.get_exp_arr_in())
+        self.log_arr_in = np.ascontiguousarray(self.idcodes.get_log_arr_in())
     
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
@@ -204,8 +205,8 @@ class RMIDEncoder(IdEncoder):
         if self.gf_exp <= 16:
             self.idcodes.generate_gf_outer(self.gf_exp)
 
-        self.exp_arr = self.idcodes.get_exp_arr()
-        self.log_arr = self.idcodes.get_log_arr()
+        self.exp_arr = np.ascontiguousarray(self.idcodes.get_exp_arr())
+        self.log_arr = np.ascontiguousarray(self.idcodes.get_log_arr())
     
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
@@ -516,6 +517,14 @@ def generate_structured_messages(
             # Use process-specific random state
             alphabet = [0, 1, 2, 3]
             return list(process_random.choice(alphabet, size=vec_len))
+        
+        elif pattern_type == "only_two":
+            # Generate messages with only two distinct values
+            if effective_attempt % 2 == 0:
+                return [0] * vec_len
+            else:
+                return [1] * vec_len
+            
         else:
             raise ValueError(f"Unsupported pattern type: {pattern_type}")
 
