@@ -5,58 +5,176 @@ Each plot shows all gf_exp curves for one system. Multiple plots for multiple sy
 
 import matplotlib.pyplot as plt
 import numpy as np
-from framework import IdMetrics, create_id_system, generate_test_messages
+import os
+import gc
+from framework import IdMetrics, create_id_system
+import time
+import tracemalloc
+
+def clear_memory():
+    """Force garbage collection and clear memory."""
+    gc.collect()
+    time.sleep(0.1)
 
 def main():
     print("=" * 60)
-    print("EXECUTION TIME VS VECTOR LENGTH FOR MULTIPLE GF_EXP AND SYSTEMS")
+    print("EXECUTION TIME AND MEMORY USAGE VS VECTOR LENGTH")
     print("=" * 60)
 
     # Parameters
-    vec_lengths = [2**i for i in range(1, 23, 3)]
+    vec_lengths = [2**i for i in range(1, 21, 3)]
     gf_exp_values = [8, 16, 32, 64]
     system_types = [
         ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]})),
         ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2]})),
-        ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": [2], "tag_pos_in": 2})),
+        ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": 2, "tag_pos_in": 2})),
         ("SHA1ID", lambda gf_exp: lambda vec_len: create_id_system("SHA1ID", {"gf_exp": gf_exp})),
         ("SHA256ID", lambda gf_exp: lambda vec_len: create_id_system("SHA256ID", {"gf_exp": gf_exp})),
     ]
-
-    base_num_messages = 100000
-    # For each system, collect execution time for all gf_exp and vec_lengths
+    
+    num_messages = 100
+    os.makedirs("analyses/framework_performance", exist_ok=True)
+    
+    # For each system, collect data
     for system_name, sys_factory in system_types:
         print(f"\nSystem: {system_name}")
-        plt.figure(figsize=(12, 7))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 12))
+        
         for gf_exp in gf_exp_values:
             if system_name == "RS2ID" and gf_exp > 32:
                 continue
-            exec_times = []            
+                
+            exec_times = []
+            memory_usages = []
+            
             for vec_len in vec_lengths:
                 print(f"  gf_exp={gf_exp}, vec_len={vec_len} ...", end="", flush=True)
-                num_messages = max(100, min(100 * base_num_messages // vec_len, base_num_messages))
+                
+                # Clear memory and start tracking
+                clear_memory()
+                tracemalloc.clear_traces()
+                tracemalloc.start()
+                
+                # Create system and run evaluation
                 system = sys_factory(gf_exp)(vec_len)
                 metrics = IdMetrics.evaluate_system(
                     system=system,
                     vec_len=vec_len,
                     num_messages=num_messages,
-                    message_subset_size=10,
-                    num_processes= 1,
+                    num_processes=1,
                 )
+                
+                # Get peak traced memory
+                _, peak_traced = tracemalloc.get_traced_memory()
+                traced_mb = peak_traced / (1024 * 1024)
+                
+                # Record metrics
                 exec_times.append(metrics["avg_execution_time_ms"])
-                print(f" {metrics['avg_execution_time_ms']:.3f} ms")
-            plt.plot(vec_lengths, exec_times, marker='o', label=f"GF_EXP={gf_exp}")
+                memory_usages.append(traced_mb)
+                
+                print(f" {metrics['avg_execution_time_ms']:.3f} ms, {traced_mb:.1f} MB")
+                
+                # Clean up
+                del system, metrics
+                tracemalloc.stop()
+            
+            # Plot data
+            ax1.plot(vec_lengths, exec_times, marker='o', label=f"GF_EXP={gf_exp}")
+            ax2.plot(vec_lengths, memory_usages, marker='s', label=f"GF_EXP={gf_exp}")
 
-        plt.title(f"Execution Time vs Vector Length for {system_name} - {base_num_messages} Messages", fontsize=15, fontweight='bold')
-        plt.xlabel("Vector Length", fontsize=13)
-        plt.ylabel("Avg Execution Time (ms)", fontsize=13)
-        plt.xscale("log", base=2)
-        plt.yscale("log")
-        plt.grid(True, alpha=0.3)
-        plt.legend(fontsize=11)
+        # Configure plots
+        ax1.set_title(f"Execution Time vs Vector Length for {system_name}", fontsize=15)
+        ax1.set_xlabel("Vector Length", fontsize=13)
+        ax1.set_ylabel("Avg Execution Time (ms)", fontsize=13)
+        ax1.set_xscale("log", base=2)
+        ax1.set_yscale("log")
+        ax1.grid(True, alpha=0.3)
+        ax1.legend()
+        
+        ax2.set_title(f"Memory Usage vs Vector Length for {system_name}", fontsize=15)
+        ax2.set_xlabel("Vector Length", fontsize=13)
+        ax2.set_ylabel("Memory Usage (MB)", fontsize=13)
+        ax2.set_xscale("log", base=2)
+        ax2.set_yscale("log")
+        ax2.grid(True, alpha=0.3)
+        ax2.legend()
+        
         plt.tight_layout()
-        plt.savefig(f"analyses/framework_performance/exec_time_vs_vec_length_{system_name}.png", dpi=300, bbox_inches='tight')
-        print(f"Saved plot: analyses/framework_performance/exec_time_vs_vec_length_{system_name}.png")
+        plt.savefig(f"analyses/framework_performance/performance_{system_name}.png", dpi=300)
+        print(f"Saved plot: analyses/framework_performance/performance_{system_name}.png")
+        plt.close()
+
+    # Create summary comparison plot
+    print("\nCreating summary comparison...")
+    create_summary_plots(system_types, vec_lengths, 16, num_messages)
+
+def create_summary_plots(system_types, vec_lengths, comparison_gf_exp, num_messages):
+    """Create summary plots comparing all systems for a specific gf_exp value."""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+    
+    for system_name, sys_factory in system_types:
+        if system_name == "RS2ID" and comparison_gf_exp > 32:
+            continue
+            
+        exec_times = []
+        memory_usages = []
+        
+        for vec_len in vec_lengths:
+            print(f"  Summary: {system_name}, vec_len={vec_len} ...", end="", flush=True)
+            
+            # Clear memory and start tracking
+            clear_memory()
+            tracemalloc.clear_traces()
+            tracemalloc.start()
+            
+            # Create system and evaluate
+            system = sys_factory(comparison_gf_exp)(vec_len)
+            metrics = IdMetrics.evaluate_system(
+                system=system,
+                vec_len=vec_len,
+                num_messages=num_messages,
+                num_processes=1,
+            )
+            
+            # Get traced memory
+            _, peak_traced = tracemalloc.get_traced_memory()
+            traced_mb = peak_traced / (1024 * 1024)
+            
+            # Record metrics
+            exec_times.append(metrics["avg_execution_time_ms"])
+            memory_usages.append(traced_mb)
+            
+            print(f" done ({metrics['avg_execution_time_ms']:.3f} ms, {traced_mb:.1f} MB)")
+            
+            # Clean up
+            del system, metrics
+            tracemalloc.stop()
+        
+        # Plot comparison data
+        ax1.plot(vec_lengths, exec_times, marker='o', label=system_name, linewidth=2)
+        ax2.plot(vec_lengths, memory_usages, marker='s', label=system_name, linewidth=2)
+    
+    # Configure plots
+    ax1.set_title(f"Execution Time Comparison (GF_EXP={comparison_gf_exp})", fontsize=15)
+    ax1.set_xlabel("Vector Length", fontsize=13)
+    ax1.set_ylabel("Avg Execution Time (ms)", fontsize=13)
+    ax1.set_xscale("log", base=2)
+    ax1.set_yscale("log")
+    ax1.grid(True, alpha=0.3)
+    ax1.legend()
+    
+    ax2.set_title(f"Memory Usage Comparison (GF_EXP={comparison_gf_exp})", fontsize=15)
+    ax2.set_xlabel("Vector Length", fontsize=13)
+    ax2.set_ylabel("Memory Usage (MB)", fontsize=13)
+    ax2.set_xscale("log", base=2)
+    ax2.set_yscale("log")
+    ax2.grid(True, alpha=0.3)
+    ax2.legend()
+    
+    plt.tight_layout()
+    plt.savefig(f"analyses/framework_performance/system_comparison_gf{comparison_gf_exp}.png", dpi=300)
+    print(f"Saved comparison plot: analyses/framework_performance/system_comparison_gf{comparison_gf_exp}.png")
+    plt.close()
 
 if __name__ == "__main__":
     main()
