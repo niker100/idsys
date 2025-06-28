@@ -243,7 +243,7 @@ class IdMetrics:
             message_length = vec_len
         
         # Calculate code rate
-        code_rate = IdMetrics._calculate_code_rate(system_type, message_length, gf_exp)
+        code_rate = IdMetrics._calculate_code_rate(system_type, vec_len*8 , gf_exp)
 
         # Run parallel message processing with integrated metrics calculation
         fp_rate, false_positives, timing_metrics, collision_metrics, total_messages, aggregated_metrics = IdMetrics._propagate_messages_parallel(
@@ -266,6 +266,7 @@ class IdMetrics:
             
             # Efficiency metrics
             'throughput_msgs_per_sec': 1000.0 / timing_metrics['avg_execution_time_ms'] if timing_metrics['avg_execution_time_ms'] > 0 else 0,
+            
 
             # Message set characteristics            
             'message_pdf': aggregated_metrics['message_pdf'],
@@ -290,8 +291,8 @@ class IdMetrics:
     
     @staticmethod
     def _calculate_code_rate(system_type: str, avg_message_length: float, gf_exp: int) -> float:
-        """Calculate effective code rate defined as the ratio of message bits to tag/output bits."""
-        return avg_message_length * 8 / float(gf_exp)
+        """Calculate effective code rate defined as the ratio of log2(log2(N))/output bits."""
+        return np.log2(np.log2(avg_message_length)) / float(2**gf_exp)
     
     @staticmethod
     def _get_system_info(system: IdSystem) -> Tuple[str, Dict]:
