@@ -230,9 +230,9 @@ class IdMetrics:
         encoder = system.encoder
         params = getattr(encoder, 'parameters', {})
         gf_exp = params.get('gf_exp', 8)
-        system_type = type(encoder).__name__.replace('Encoder', '')
+        num_tags = len(params.get('tag_pos'))
 
-        # Calculate approximate message length for code rate
+        # Calculate approximate message length in symbols
         if gf_exp >= 33:
             message_length = vec_len // 8
         elif gf_exp >= 17:
@@ -243,7 +243,7 @@ class IdMetrics:
             message_length = vec_len
         
         # Calculate code rate
-        code_rate = IdMetrics._calculate_code_rate(system_type, vec_len*8 , gf_exp)
+        code_rate_bulk, coderate_subsequently = IdMetrics._calculate_code_rate(num_tags, vec_len*8 , gf_exp)
 
         # Run parallel message processing with integrated metrics calculation
         fp_rate, false_positives, timing_metrics, collision_metrics, total_messages, aggregated_metrics = IdMetrics._propagate_messages_parallel(
@@ -256,7 +256,8 @@ class IdMetrics:
             'total_messages': total_messages,
             'false_positive_rate': fp_rate,
             'false_positives': false_positives,
-            'code_rate': code_rate,
+            'code_rate_bulk': code_rate_bulk,
+            'code_rate_subsequently': coderate_subsequently,
             
             # Timing metrics
             'avg_execution_time_ms': timing_metrics['avg_execution_time_ms'],
@@ -290,9 +291,18 @@ class IdMetrics:
         return results
     
     @staticmethod
-    def _calculate_code_rate(system_type: str, avg_message_length: float, gf_exp: int) -> float:
+    def _calculate_code_rate(num_tags: int, avg_message_length: float, gf_exp: int) -> Tuple[float, float]:
         """Calculate effective code rate defined as the ratio of log2(log2(N))/output bits."""
-        return np.log2(np.log2(avg_message_length)) / float(2**gf_exp)
+        symobl_size = float(2**gf_exp)
+        avg_num_tags = 1 #average number of tags for subsequent transmission of multipe tags (geometric series)
+        for i in range(1,num_tags):
+            avg_num_tags = avg_num_tags + 1/symobl_size
+
+        coderate_single = np.log2(np.log2(avg_message_length)) / symobl_size #code rate for single tag transmission
+        coderate_bulk = coderate_single / num_tags #code rate for bulk transmission of multiple tags
+        coderate_subsequently = coderate_single / avg_num_tags #code rate for subsequent transmission of multipe tags
+
+        return coderate_bulk, coderate_subsequently
     
     @staticmethod
     def _get_system_info(system: IdSystem) -> Tuple[str, Dict]:
