@@ -6,7 +6,7 @@ This module provides the fundamental classes and functions for
 implementing and evaluating identification systems with multiple coding schemes.
 """
 from typing import List, Any, Optional, Dict, Set, Tuple
-from idcodes.idcodes import IDCODES_U8, IDCODES_U16, IDCODES_U32, IDCODES_U64
+from ecidcodes.idcodes import IDCODES_U8, IDCODES_U16, IDCODES_U32, IDCODES_U64
 import numpy as np
 
 
@@ -92,9 +92,7 @@ class RSIDEncoder(IdEncoder):
         self.idcodes = _get_idcodes_instance(self.gf_exp)
         if self.gf_exp <= 16:
             self.idcodes.generate_gf_outer(self.gf_exp)
-            
-        self.exp_arr = np.ascontiguousarray(self.idcodes.get_exp_arr())
-        self.log_arr = np.ascontiguousarray(self.idcodes.get_log_arr())
+            self.idcodes.initialize_gf(self.idcodes.get_exp_arr(), self.idcodes.get_log_arr(), self.gf_exp)            
     
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
@@ -103,7 +101,7 @@ class RSIDEncoder(IdEncoder):
     def encode(self, message: List[int]) -> List[int]:
         tags = []
         for tag_pos in self.parameters["tag_pos"]:
-            tags.append(self.idcodes.rsid(message, tag_pos, self.exp_arr, self.log_arr, self.gf_exp))
+            tags.append(self.idcodes.rsid(message, tag_pos, self.gf_exp))
         return tags
 
 
@@ -143,14 +141,11 @@ class RS2IDEncoder(IdEncoder):
         if self.gf_exp <= 16:
             self.idcodes.generate_gf_outer(self.gf_exp)
             self.idcodes.generate_gf_inner(self.gf_exp)
+            self.idcodes.initialize_gf(self.idcodes.get_exp_arr(), self.idcodes.get_log_arr(), self.gf_exp)
         elif self.gf_exp <= 32:
             self.idcodes.generate_gf_inner(self.gf_exp // 2)
+            # self.idcodes.initialize_gf(self.idcodes.get_exp_arr_in(), self.idcodes.get_log_arr_in(), self.gf_exp // 2)
     
-        
-        self.exp_arr = np.ascontiguousarray(self.idcodes.get_exp_arr())
-        self.log_arr = np.ascontiguousarray(self.idcodes.get_log_arr())
-        self.exp_arr_in = np.ascontiguousarray(self.idcodes.get_exp_arr_in())
-        self.log_arr_in = np.ascontiguousarray(self.idcodes.get_log_arr_in())
     
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
@@ -160,12 +155,7 @@ class RS2IDEncoder(IdEncoder):
         tag_pos = self.parameters["tag_pos"]
         tag_pos_in = self.parameters["tag_pos_in"]
         
-        result = self.idcodes.rs2id(
-            message, tag_pos, tag_pos_in, 
-            self.exp_arr, self.log_arr, 
-            self.exp_arr_in, self.log_arr_in, 
-            self.gf_exp
-        )
+        result = self.idcodes.rs2id(message, tag_pos, tag_pos_in, self.gf_exp)
         return result
 
 
@@ -204,10 +194,9 @@ class RMIDEncoder(IdEncoder):
         self.idcodes = _get_idcodes_instance(self.gf_exp)
         if self.gf_exp <= 16:
             self.idcodes.generate_gf_outer(self.gf_exp)
+            self.idcodes.initialize_gf(self.idcodes.get_exp_arr(), self.idcodes.get_log_arr(), self.gf_exp)
 
-        self.exp_arr = np.ascontiguousarray(self.idcodes.get_exp_arr())
-        self.log_arr = np.ascontiguousarray(self.idcodes.get_log_arr())
-    
+
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         super().set_parameters(parameters)
         self._init_idcodes()
@@ -217,7 +206,8 @@ class RMIDEncoder(IdEncoder):
         tags = []
         
         for tag_pos in self.parameters["tag_pos"]:
-            tags.append(self.idcodes.rmid(message, tag_pos, rm_order, self.exp_arr, self.log_arr, self.gf_exp))
+            # print(f"Encoding {message} RMID with tag_pos={tag_pos}, rm_order={rm_order}, gf_exp={self.gf_exp}")
+            tags.append(self.idcodes.rmid(message, tag_pos, rm_order, self.gf_exp))
         return tags
 
 
@@ -458,21 +448,22 @@ def generate_structured_messages(
     process_seed = base_seed + worker_offset
     process_random = np.random.RandomState(process_seed)
 
+    Id = _get_idcodes_instance(gf_exp)
+    if gf_exp >= 33:
+        vec_len_ = vec_len // 8
+    elif gf_exp >= 17:
+        vec_len_ = vec_len // 4
+    elif gf_exp >= 9:
+        vec_len_ = vec_len // 2
+    else:
+        vec_len_ = vec_len
+
     # Helper to generate a single message for a given attempt
     def _gen_pattern(attempt):
         # Use process-specific attempt counter
         effective_attempt = attempt + (worker_offset * 1000)  # Large offset to avoid overlaps
         
         if pattern_type == 'random':
-            Id = _get_idcodes_instance(gf_exp)
-            if gf_exp >= 33:
-                vec_len_ = vec_len // 8
-            elif gf_exp >= 17:
-                vec_len_ = vec_len // 4
-            elif gf_exp >= 9:
-                vec_len_ = vec_len // 2
-            else:
-                vec_len_ = vec_len
             
             msg = Id.generate_string_sequence(vec_len_)           
 
