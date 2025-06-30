@@ -7,14 +7,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import gc
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from framework import IdMetrics, create_id_system
 import time
 import tracemalloc
-
-def clear_memory():
-    """Force garbage collection and clear memory."""
-    gc.collect()
-    time.sleep(0.1)
 
 def main():
     print("=" * 60)
@@ -22,12 +19,12 @@ def main():
     print("=" * 60)
 
     # Parameters
-    vec_lengths = [2**i for i in range(1, 21, 3)]
+    vec_lengths = [2**i for i in range(4, 17, 3)]
     gf_exp_values = [8, 16, 32, 64]
     system_types = [
-        ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]})),
-        ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2]})),
-        ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": 2, "tag_pos_in": 2})),
+        ("RSID", lambda gf_exp: lambda vec_len: create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [1]})),
+        ("RMID", lambda gf_exp: lambda vec_len: create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [1]})),
+        ("RS2ID", lambda gf_exp: lambda vec_len: create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": 1, "tag_pos_in": 1})),
         ("SHA1ID", lambda gf_exp: lambda vec_len: create_id_system("SHA1ID", {"gf_exp": gf_exp})),
         ("SHA256ID", lambda gf_exp: lambda vec_len: create_id_system("SHA256ID", {"gf_exp": gf_exp})),
     ]
@@ -43,6 +40,8 @@ def main():
         for gf_exp in gf_exp_values:
             if system_name == "RS2ID" and gf_exp > 32:
                 continue
+            if system_name == "RMID" and gf_exp > 32:
+                continue
                 
             exec_times = []
             memory_usages = []
@@ -51,7 +50,6 @@ def main():
                 print(f"  gf_exp={gf_exp}, vec_len={vec_len} ...", end="", flush=True)
                 
                 # Clear memory and start tracking
-                clear_memory()
                 tracemalloc.clear_traces()
                 tracemalloc.start()
                 
@@ -104,77 +102,6 @@ def main():
         print(f"Saved plot: analyses/framework_performance/performance_{system_name}.png")
         plt.close()
 
-    # Create summary comparison plot
-    print("\nCreating summary comparison...")
-    create_summary_plots(system_types, vec_lengths, 16, num_messages)
-
-def create_summary_plots(system_types, vec_lengths, comparison_gf_exp, num_messages):
-    """Create summary plots comparing all systems for a specific gf_exp value."""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
-    
-    for system_name, sys_factory in system_types:
-        if system_name == "RS2ID" and comparison_gf_exp > 32:
-            continue
-            
-        exec_times = []
-        memory_usages = []
-        
-        for vec_len in vec_lengths:
-            print(f"  Summary: {system_name}, vec_len={vec_len} ...", end="", flush=True)
-            
-            # Clear memory and start tracking
-            clear_memory()
-            tracemalloc.clear_traces()
-            tracemalloc.start()
-            
-            # Create system and evaluate
-            system = sys_factory(comparison_gf_exp)(vec_len)
-            metrics = IdMetrics.evaluate_system(
-                system=system,
-                vec_len=vec_len,
-                num_messages=num_messages,
-                num_processes=1,
-            )
-            
-            # Get traced memory
-            _, peak_traced = tracemalloc.get_traced_memory()
-            traced_mb = peak_traced / (1024 * 1024)
-            
-            # Record metrics
-            exec_times.append(metrics["avg_execution_time_ms"])
-            memory_usages.append(traced_mb)
-            
-            print(f" done ({metrics['avg_execution_time_ms']:.3f} ms, {traced_mb:.1f} MB)")
-            
-            # Clean up
-            del system, metrics
-            tracemalloc.stop()
-        
-        # Plot comparison data
-        ax1.plot(vec_lengths, exec_times, marker='o', label=system_name, linewidth=2)
-        ax2.plot(vec_lengths, memory_usages, marker='s', label=system_name, linewidth=2)
-    
-    # Configure plots
-    ax1.set_title(f"Execution Time Comparison (GF_EXP={comparison_gf_exp})", fontsize=15)
-    ax1.set_xlabel("Vector Length", fontsize=13)
-    ax1.set_ylabel("Avg Execution Time (ms)", fontsize=13)
-    ax1.set_xscale("log", base=2)
-    ax1.set_yscale("log")
-    ax1.grid(True, alpha=0.3)
-    ax1.legend()
-    
-    ax2.set_title(f"Memory Usage Comparison (GF_EXP={comparison_gf_exp})", fontsize=15)
-    ax2.set_xlabel("Vector Length", fontsize=13)
-    ax2.set_ylabel("Memory Usage (MB)", fontsize=13)
-    ax2.set_xscale("log", base=2)
-    ax2.set_yscale("log")
-    ax2.grid(True, alpha=0.3)
-    ax2.legend()
-    
-    plt.tight_layout()
-    plt.savefig(f"analyses/framework_performance/system_comparison_gf{comparison_gf_exp}.png", dpi=300)
-    print(f"Saved comparison plot: analyses/framework_performance/system_comparison_gf{comparison_gf_exp}.png")
-    plt.close()
 
 if __name__ == "__main__":
     main()

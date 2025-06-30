@@ -20,9 +20,9 @@ def main():
     print("=" * 50)
 
     # Range of gf_exp values to test
-    gf_exp_values = [8, 32]
-    num_messages = 2**30  # Number of messages to generate for each gf_exp
-    vec_len = 4  # Fixed vector length for this test 1000bit
+    gf_exp_values = [8, 16, 32]
+    num_messages = 10**8  # Number of messages to generate for each gf_exp
+    vec_len = 8  # Fixed vector length for this test 1000bit
 
     # Create systems as a dictionary for compare_systems
     system_types = [
@@ -42,7 +42,6 @@ def main():
             systems=systems,
             num_messages=num_messages,
             vec_len=vec_len,
-            message_subset_size=0
         )
 
         # Store results for each system
@@ -72,9 +71,7 @@ def main():
 
     print(f"System results saved to {output_file}")
 
-    return
-
-    
+    return    
 
 if __name__ == "__main__":
     main()

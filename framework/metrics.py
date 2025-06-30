@@ -34,7 +34,7 @@ def _worker_generate_and_test(args):
     }
     
     # Sample collided messages (limit to reasonable number)
-    max_collided_samples = min(100, batch_size // 100)
+    max_collided_samples = 100
     collided_msgs_sample = []
     
     # Create a generator for this worker's messages
@@ -522,7 +522,6 @@ class IdMetrics:
         systems: Dict[str, IdSystem], 
         num_messages: int = 1000, 
         vec_len: int = 16,
-        message_subset_size: int = 10,
         num_processes: int = None,
         message_pattern: str = 'random'
     ) -> Dict[str, Dict[str, float]]:
@@ -533,7 +532,6 @@ class IdMetrics:
             systems: Dictionary mapping system names to IdSystem instances
             num_messages: Number of messages to test
             vec_len: Vector length in bytes
-            message_subset_size: Size of message subset for compute intensive metrics
             num_processes: Number of processes to use for parallelization
             
         Returns:
@@ -544,7 +542,7 @@ class IdMetrics:
         for name, system in systems.items():
             print(f"Evaluating {name}...")
             results[name] = IdMetrics.evaluate_system(
-                system, num_messages, vec_len, message_subset_size=message_subset_size,
+                system, num_messages, vec_len,
                 num_processes=num_processes, message_pattern=message_pattern
             )
         
