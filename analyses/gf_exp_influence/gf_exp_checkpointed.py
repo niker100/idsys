@@ -53,7 +53,6 @@ def create_parameter_sets():
                 "gf_exp": gf_exp,
                 "vec_len": vec_len,
                 "num_messages": num_messages,
-                "message_subset_size": message_subset_size,
                 "test_type": None,
                 "tag_pos": None,
                 "num_tags": None,
@@ -88,8 +87,7 @@ def analyze_single_combination(params):
     results = IdMetrics.evaluate_system(
         system=system,
         vec_len=params["vec_len"],
-        num_messages=params["num_messages"],
-        message_subset_size=params["message_subset_size"]
+        num_messages=params["num_messages"]
     )
     
     # Return results
