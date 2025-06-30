@@ -230,7 +230,7 @@ class IdMetrics:
         encoder = system.encoder
         params = getattr(encoder, 'parameters', {})
         gf_exp = params.get('gf_exp', 8)
-        num_tags = len(params.get('tag_pos'))
+        num_tags = len(params.get('tag_pos')) if isinstance(params.get('tag_pos'), list) else 1
 
         # Calculate approximate message length in symbols
         if gf_exp >= 33:
