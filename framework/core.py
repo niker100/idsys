@@ -474,17 +474,8 @@ def generate_structured_messages(
             else:
                 vec_len_ = vec_len
             
-            # For random mode, seed the PRNG for each message
-            Id.set_seed(effective_attempt) if hasattr(Id, 'set_seed') else None
-            msg = Id.generate_string_sequence(vec_len_)
-            
-            # Add some process-specific randomization
-            if worker_offset > 0:
-                # Randomly perturb some elements to ensure uniqueness across processes
-                num_changes = max(1, int(vec_len_ * 0.1))  # Change ~10% of elements
-                for _ in range(num_changes):
-                    pos = process_random.randint(0, len(msg)-1)
-                    msg[pos] = process_random.randint(0, 2**gf_exp-1)
+            msg = Id.generate_string_sequence(vec_len_)           
+
             return msg
             
         elif pattern_type == "incremental":

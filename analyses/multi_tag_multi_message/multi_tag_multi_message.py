@@ -33,7 +33,7 @@ def main():
     
     # Base parameters
     vec_len = 4
-    num_messages = 10**5  # Use fewer messages for faster runs
+    num_messages = 10**6  # Use fewer messages for faster runs
     base_rate = 2**(-8)   # Theoretical base rate for GF(2^8)
     trials = 1  # Number of trials for empirical evaluation with small num_messages
     n_id = 2**(vec_len)  # Number of possible IDs for GF(2^8) with vec_len in bytes
@@ -58,8 +58,7 @@ def main():
             system=system,
             vec_len=vec_len,
             num_messages=num_messages,
-            num_validation_messages=k,
-            show_progress=False
+            num_validation_messages=k
         )
         
         empirical = results['false_positive_rate']
@@ -77,6 +76,8 @@ def main():
     plt.title("False Positive Rate vs Number of Validation Messages", fontsize=14)
     plt.xlabel("Number of Validation Messages (k)", fontsize=12)
     plt.ylabel("False Positive Rate", fontsize=12)
+    plt.xscale('log', base=10)
+    plt.yscale('log', base=2)
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
@@ -125,7 +126,7 @@ def main():
     print("-" * 80)
     
     combined_results = []
-    num_messages = 10**8
+    num_messages = 10**6
     ks = [100, 500, 1000]  # k values for combined analysis
     
     for tag_pos in [[2], [2, 3], [2, 3, 4]]:
@@ -167,7 +168,7 @@ def main():
         plt.grid(True, alpha=0.3)
         plt.legend()
         plt.tight_layout()
-        plt.savefig(f"analyses/multi_tag_multi_message/combined_analysis_{result['tags']}.png", dpi=300)
+        # plt.savefig(f"analyses/multi_tag_multi_message/combined_analysis_{result['tags']}.png", dpi=300)
     plt.show()
 
     print("\nAnalysis complete! Results saved in analyses/multi_tag_multi_message/")
