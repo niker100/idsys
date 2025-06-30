@@ -295,8 +295,9 @@ class IdMetrics:
         """Calculate effective code rate defined as the ratio of log2(log2(N))/output bits."""
         symobl_size = float(2**gf_exp)
         avg_num_tags = 1 #average number of tags for subsequent transmission of multipe tags (geometric series)
-        for i in range(1,num_tags):
-            avg_num_tags = avg_num_tags + 1/symobl_size
+        if num_tags > 1:
+            for i in range(1,num_tags):
+                avg_num_tags = avg_num_tags + 1/(symobl_size**i)
 
         coderate_single = np.log2(np.log2(avg_message_length)) / symobl_size #code rate for single tag transmission
         coderate_bulk = coderate_single / num_tags #code rate for bulk transmission of multiple tags
