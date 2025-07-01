@@ -127,8 +127,8 @@ class RS2IDEncoder(IdEncoder):
     def __init__(self, parameters: Optional[Dict[str, Any]] = None):
         default_params = {
             "gf_exp": 8,
-            "tag_pos": 2,
-            "tag_pos_in": 2
+            "tag_pos": [2],
+            "tag_pos_in": [2]
         }
         super().__init__(default_params)
         if parameters:
@@ -155,7 +155,7 @@ class RS2IDEncoder(IdEncoder):
         tag_pos = self.parameters["tag_pos"]
         tag_pos_in = self.parameters["tag_pos_in"]
         
-        result = self.idcodes.rs2id(message, tag_pos, tag_pos_in, self.gf_exp)
+        result = self.idcodes.rs2id(message, tag_pos[0], tag_pos_in[0], self.gf_exp)
         return result
 
 
