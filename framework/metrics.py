@@ -19,7 +19,7 @@ from .core import IdSystem, generate_test_messages, create_id_system, generate_s
 
 def _worker_generate_and_test(args):
     """Memory-optimized worker function for generating and testing messages."""
-    system_type, system_params, codeword, vec_len, gf_exp, batch_size, num_validation_messages, message_pattern, worker_seed = args
+    system_type, system_params, codeword, vec_len, gf_exp, batch_size, num_validation_messages, message_pattern, worker_seed, calculate_pdfs = args
     
     # Recreate the system in the worker process
     system = create_id_system(system_type, system_params)
@@ -51,9 +51,13 @@ def _worker_generate_and_test(args):
         'max': float('-inf')
     }
     
-    # Use counters for PDFs instead of storing all symbols
-    message_symbol_counts = Counter()
-    tag_symbol_counts = Counter()
+    # Use counters for PDFs instead of storing all symbols (only if calculating PDFs)
+    if calculate_pdfs:
+        message_symbol_counts = Counter()
+        tag_symbol_counts = Counter()
+    else:
+        message_symbol_counts = None
+        tag_symbol_counts = None
     
     # Process messages
     messages_processed = 0
@@ -64,15 +68,17 @@ def _worker_generate_and_test(args):
         if first_message is None:
             first_message = list(message)
         
-        # Update message symbols for PDF calculation
-        message_symbol_counts.update(message)
+        # Update message symbols for PDF calculation (only if calculating PDFs)
+        if calculate_pdfs:
+            message_symbol_counts.update(message)
         
         # Calculate tag for this message and update tag PDF
         tag = system.send(message)
-        if isinstance(tag, list):
-            tag_symbol_counts.update(tag)
-        else:
-            tag_symbol_counts[tag] += 1
+        if calculate_pdfs:
+            if isinstance(tag, list):
+                tag_symbol_counts.update(tag)
+            else:
+                tag_symbol_counts[tag] += 1
         
         # Calculate hamming distance using Welford's online algorithm
         if first_message:
@@ -137,12 +143,16 @@ def _worker_generate_and_test(args):
             if len(collided_msgs_sample) < max_collided_samples:
                 collided_msgs_sample.append(collided_message)
     
-    # Calculate PDFs from counts
-    message_symbols_total = sum(message_symbol_counts.values())
-    message_pdf = {symbol: count/message_symbols_total for symbol, count in message_symbol_counts.items()} if message_symbols_total else {}
-    
-    tag_symbols_total = sum(tag_symbol_counts.values())
-    tag_pdf = {symbol: count/tag_symbols_total for symbol, count in tag_symbol_counts.items()} if tag_symbols_total else {}
+    # Calculate PDFs from counts (only if calculating PDFs)
+    if calculate_pdfs and message_symbol_counts is not None:
+        message_symbols_total = sum(message_symbol_counts.values())
+        message_pdf = {symbol: count/message_symbols_total for symbol, count in message_symbol_counts.items()} if message_symbols_total else {}
+        
+        tag_symbols_total = sum(tag_symbol_counts.values())
+        tag_pdf = {symbol: count/tag_symbols_total for symbol, count in tag_symbol_counts.items()} if tag_symbols_total else {}
+    else:
+        message_pdf = {}
+        tag_pdf = {}
     
     # Calculate std dev for hamming distances
     hamming_std = math.sqrt(hamming_stats['M2'] / hamming_stats['count']) if hamming_stats['count'] > 1 else 0.0
@@ -210,7 +220,8 @@ class IdMetrics:
         vec_len: int = 16,
         num_validation_messages: int = 1,
         num_processes: int = None,
-        message_pattern: str = 'random'
+        message_pattern: str = 'random',
+        calculate_pdfs: bool = True
     ) -> Dict[str, float]:
         """
         Complete evaluation of an identification system.
@@ -221,6 +232,8 @@ class IdMetrics:
             vec_len: Length of the messages in byte
             num_validation_messages: Number of valid messages at the receiver for k-identification problem
             num_processes: Number of processes to use for parallelization (None for auto)
+            message_pattern: Pattern for message generation ('random', 'incremental', etc.)
+            calculate_pdfs: Whether to calculate message and tag PDFs (default: True)
 
         Returns:
             Dictionary containing all metrics
@@ -247,7 +260,7 @@ class IdMetrics:
 
         # Run parallel message processing with integrated metrics calculation
         fp_rate, false_positives, timing_metrics, collision_metrics, total_messages, aggregated_metrics = IdMetrics._propagate_messages_parallel(
-            system, vec_len, num_messages, num_validation_messages, num_processes, message_pattern
+            system, vec_len, num_messages, num_validation_messages, num_processes, message_pattern, calculate_pdfs
         )
 
         # Compile comprehensive results
@@ -270,7 +283,7 @@ class IdMetrics:
             
 
             # Message set characteristics            
-            'message_pdf': aggregated_metrics['message_pdf'],
+            'message_pdf': aggregated_metrics['message_pdf'] if calculate_pdfs else {},
             'avg_hamming_distance': aggregated_metrics['hamming_metrics']['avg_hamming_distance'],
             'min_hamming_distance': aggregated_metrics['hamming_metrics']['min_hamming_distance'],
             'max_hamming_distance': aggregated_metrics['hamming_metrics']['max_hamming_distance'],
@@ -285,7 +298,7 @@ class IdMetrics:
             
             # Tag characteristics
             'tag_size_bits': float(gf_exp),
-            'tag_pdf': aggregated_metrics['tag_pdf'],
+            'tag_pdf': aggregated_metrics['tag_pdf'] if calculate_pdfs else {},
         }
         
         return results
@@ -320,7 +333,8 @@ class IdMetrics:
         num_messages: int,
         num_validation_messages: int = 1,
         num_processes: int = None,
-        message_pattern: str = 'random'
+        message_pattern: str = 'random',
+        calculate_pdfs: bool = True
     ) -> Tuple[float, int, Dict[str, float], Dict[str, float], int, Dict]:
         """Memory-optimized parallelized version that generates messages and calculates metrics on demand."""
         if num_messages < 2:
@@ -364,7 +378,8 @@ class IdMetrics:
                 actual_batch_size, 
                 num_validation_messages,
                 message_pattern,
-                worker_seed
+                worker_seed,
+                calculate_pdfs
             ))
         
         # Initialize result aggregation
@@ -505,8 +520,8 @@ class IdMetrics:
                 }
         
         # Combine PDFs efficiently
-        combined_message_pdf = IdMetrics._merge_pdfs(all_message_pdfs)
-        combined_tag_pdf = IdMetrics._merge_pdfs(all_tag_pdfs)
+        combined_message_pdf = IdMetrics._merge_pdfs(all_message_pdfs) if calculate_pdfs else {}
+        combined_tag_pdf = IdMetrics._merge_pdfs(all_tag_pdfs) if calculate_pdfs else {}
         
         # Compile aggregated metrics
         aggregated_metrics = {
@@ -524,7 +539,8 @@ class IdMetrics:
         num_messages: int = 1000, 
         vec_len: int = 16,
         num_processes: int = None,
-        message_pattern: str = 'random'
+        message_pattern: str = 'random',
+        calculate_pdfs: bool = True
     ) -> Dict[str, Dict[str, float]]:
         """
         Compare multiple identification systems.
@@ -534,6 +550,8 @@ class IdMetrics:
             num_messages: Number of messages to test
             vec_len: Vector length in bytes
             num_processes: Number of processes to use for parallelization
+            message_pattern: Pattern for message generation ('random', 'incremental', etc.)
+            calculate_pdfs: Whether to calculate message and tag PDFs (default: True)
             
         Returns:
             Dictionary mapping system names to their comprehensive metrics
@@ -544,7 +562,8 @@ class IdMetrics:
             print(f"Evaluating {name}...")
             results[name] = IdMetrics.evaluate_system(
                 system, num_messages, vec_len,
-                num_processes=num_processes, message_pattern=message_pattern
+                num_processes=num_processes, message_pattern=message_pattern,
+                calculate_pdfs=calculate_pdfs
             )
         
         return results
