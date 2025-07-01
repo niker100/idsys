@@ -37,7 +37,7 @@ from framework.checkpoint import create_checkpoint_manager
 ANALYSIS_CONFIG = {
     "system_types": ["RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"],
     "gf_exponents": [8, 16, 32, 64],
-    "vector_lengths": [2**i for i in range(2, 17)],  # 4 to 65536
+    "vector_lengths": [2**i for i in range(3, 17)],  # 8 to 65536
     "validation_messages": [1, 10, 100],
     "message_patterns": ["random", "sparse", "low_entropy"],
     "tag_counts": {
