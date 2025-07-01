@@ -112,28 +112,8 @@ def analyze_single_combination(params):
         num_messages=params["num_messages"],
         num_validation_messages=params["num_validation_messages"]
     )
-    
-    # Calculate theoretical values
-    num_tags = len(params["tag_pos"])
-    if params["test_type"] == "multi_validation_single_tag":
-        # Theoretical: num_validation_messages * 2^(-8)
-        theoretical_fp_rate = params["num_validation_messages"] * (2**(-8))
-    elif params["test_type"] == "multi_tag_single_validation":
-        # Theoretical: 2^(-8 * num_tags)
-        theoretical_fp_rate = 2**(-8 * num_tags)
-    else:  # multi_tag_multi_validation
-        # Theoretical: num_validation_messages * 2^(-8 * num_tags)
-        theoretical_fp_rate = params["num_validation_messages"] * (2**(-8 * num_tags))
-    
-    # Return results
-    return {
-        "num_tags": num_tags,
-        "false_positive_rate": results["false_positive_rate"],
-        "theoretical_fp_rate": theoretical_fp_rate,
-        "false_positives": results["false_positives"],
-        "avg_execution_time_ms": results.get("avg_execution_time_ms", 0),
-        "reliability": results.get("reliability", 0)
-    }
+    # Only return results from evaluate_system (do not add theoretical_fp_rate or num_tags)
+    return results
 
 
 def run_multi_tag_analysis_with_checkpointing():
@@ -186,25 +166,12 @@ def run_multi_tag_analysis_with_checkpointing():
             # Save result to checkpoint
             checkpoint.add_result(params, results)
             
-            # Print results (similar to original script output)
-            fp_rate = results["false_positive_rate"]
-            theoretical = results["theoretical_fp_rate"]
-            num_tags = results["num_tags"]
-            
-            if params["test_type"] == "multi_validation_single_tag":
-                print(f"   fp_rate for num_validation_messages={params['num_validation_messages']}: "
-                      f"{fp_rate:.6f}, theoretical: {theoretical:.6f}")
-            elif params["test_type"] == "multi_tag_single_validation":
-                print(f"   fp_rate for {num_tags} tags: {fp_rate:.8f}, "
-                      f"theoretical: {theoretical:.8f}")
-            else:  # multi_tag_multi_validation
-                print(f"   fp_rate for {num_tags} tags and num_validation_messages={params['num_validation_messages']}: "
-                      f"{fp_rate:.8f}, theoretical: {theoretical:.8f}")
-            
+            # Print results (only those from evaluate_system)
+            fp_rate = results.get("false_positive_rate", None)
+            print(f"   fp_rate: {fp_rate}")
             # Print progress
             completion = checkpoint.get_completion_percentage()
             print(f"   Progress: {completion:.1f}% complete")
-            
         except Exception as e:
             print(f"   Error processing {params}: {e}")
             continue
@@ -236,20 +203,15 @@ def print_detailed_results(results_df):
         print("-" * 40)
         
         for _, row in subset.iterrows():
-            fp_rate = row['false_positive_rate']
-            theoretical = row['theoretical_fp_rate']
-            num_tags = row['num_tags']
-            num_val_msgs = row['num_validation_messages']
-            
+            fp_rate = row.get('false_positive_rate', None)
+            num_val_msgs = row.get('num_validation_messages', None)
+            tag_pos = row.get('tag_pos', None)
             if test_type == "multi_validation_single_tag":
-                print(f"  num_validation_messages={num_val_msgs}: "
-                      f"fp_rate={fp_rate:.6f}, theoretical={theoretical:.6f}")
+                print(f"  num_validation_messages={num_val_msgs}: fp_rate={fp_rate}")
             elif test_type == "multi_tag_single_validation":
-                print(f"  {num_tags} tags: fp_rate={fp_rate:.8f}, "
-                      f"theoretical={theoretical:.8f}")
+                print(f"  tags={tag_pos}: fp_rate={fp_rate}")
             else:  # multi_tag_multi_validation
-                print(f"  {num_tags} tags, {num_val_msgs} val_msgs: "
-                      f"fp_rate={fp_rate:.8f}, theoretical={theoretical:.8f}")
+                print(f"  tags={tag_pos}, num_validation_messages={num_val_msgs}: fp_rate={fp_rate}")
 
 
 if __name__ == "__main__":

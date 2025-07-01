@@ -90,13 +90,8 @@ def analyze_single_combination(params):
         num_messages=params["num_messages"]
     )
     
-    # Return results
-    return {
-        "false_positives": results["false_positives"],
-        "avg_execution_time_ms": results["avg_execution_time_ms"],
-        "false_positive_rate": results["false_positive_rate"],
-        "reliability": results.get("reliability", 0)
-    }
+    # Return all results from evaluate_system
+    return results
 
 
 def run_gf_exp_analysis_with_checkpointing():

@@ -104,14 +104,8 @@ def analyze_single_combination(params):
         num_messages=params["num_messages"]
     )
     
-    # Return results
-    return {
-        "avg_execution_time_ms": results["avg_execution_time_ms"],
-        "false_positive_rate": results.get("false_positive_rate", 0),
-        "false_positives": results.get("false_positives", 0),
-        "reliability": results.get("reliability", 0),
-        "code_rate": results.get("code_rate", 0)
-    }
+    # Return all results from evaluate_system
+    return results
 
 
 def run_multi_parameter_analysis_with_checkpointing():
