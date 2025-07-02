@@ -279,7 +279,6 @@ elif selected_dashboard == "FP Rate in k Identification":
             st.markdown("sparse explanation")
         
 
-
         # Pivot data for plotting multiple lines based on test_type
         if not filtered_data_1.empty and not filtered_data_2.empty:
 
@@ -290,14 +289,6 @@ elif selected_dashboard == "FP Rate in k Identification":
                 index="num_validation_messages",
                 columns="system_type",
                 values="false_positive_rate"
-            ).sort_index()
-            
-            # Choose code rate column (use code_rate_bulk if available)
-            code_rate_col = "code_rate_bulk" if "code_rate_bulk" in filtered_data.columns else "code_rate"
-            pivot_code_rate = filtered_data.pivot_table(
-                index="num_validation_messages",
-                columns="system_type",
-                values=code_rate_col
             ).sort_index()
 
 
@@ -315,8 +306,16 @@ elif selected_dashboard == "FP Rate in k Identification":
                 alt.Chart(chart_data)
                 .mark_line(point=True)
                 .encode(
-                    x=alt.X("num_validation_messages:Q", title="Number of Validation Messages"),
-                    y=alt.Y("false_positive_rate:Q", title="False Positive Rate"),
+                    x=alt.X(
+                        "num_validation_messages:Q",
+                        title="Number of Validation Messages",
+                        scale=alt.Scale(type='log', base=2)
+                    ),
+                    y=alt.Y(
+                        "false_positive_rate:Q",
+                        title="False Positive Rate",
+                        scale=alt.Scale(type='log', base=10)
+                    ),
                     color=alt.Color("vec_len:N", legend=alt.Legend(title="Vector Length", orient="bottom")),
                     tooltip=["num_validation_messages:Q", "vec_len:N", "false_positive_rate:Q"]
                 )
@@ -343,27 +342,51 @@ elif selected_dashboard == "FP Rate in k Identification":
             st.write("No data available with current filter settings.")
 
     with col3:
-        st.subheader("Code Rate")
-        if not filtered_data.empty and 'pivot_code_rate' in locals():
-            # Line chart for code rate by vector length
-            chart_data = pivot_code_rate.reset_index().melt(
-                'num_validation_messages',
-                var_name='vec_len',
-                value_name='code_rate'
-            )
-            
-            chart = (
-                alt.Chart(chart_data)
-                .mark_line(point=True)
-                .encode(
-                    x=alt.X("num_validation_messages:Q", title="Number of Validation Messages"),
-                    y=alt.Y("code_rate:Q", title="Code Rate"),
-                    color=alt.Color("vec_len:N", legend=alt.Legend(title="Vector Length", orient="bottom")),
-                    tooltip=["num_validation_messages:Q", "vec_len:N", "code_rate:Q"]
-                )
-                .properties(width=700, height=400)
-            )
-            st.altair_chart(chart, use_container_width=True)
+        if not filtered_data_1.empty and not filtered_data_2.empty:
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.subheader(f"Code Rate for {selected_system_1}")
+                
+                # Display metrics for first system type
+                code_rate_subseq = filtered_data_1['code_rate_subsequently'].mean()
+                if code_rate_subseq > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_subseq)))
+                    mantissa = code_rate_subseq / (10 ** power_of_ten)
+                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Subsequently", f"{code_rate_subseq:.3f}")
+                
+                code_rate_bulk = filtered_data_1['code_rate_bulk'].mean()
+                if code_rate_bulk > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_bulk)))
+                    mantissa = code_rate_bulk / (10 ** power_of_ten)
+                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Bulk", f"{code_rate_bulk:.3f}")
+
+            with col2:
+
+                st.subheader(f"Code Rate for {selected_system_2}")
+
+                # Display metrics for second system type
+                code_rate_subseq_2 = filtered_data_2['code_rate_subsequently'].mean()
+                if code_rate_subseq_2 > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_subseq_2)))
+                    mantissa = code_rate_subseq_2 / (10 ** power_of_ten)
+                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Subsequently", f"{code_rate_subseq_2:.3f}")
+
+                code_rate_bulk_2 = filtered_data_2['code_rate_bulk'].mean()
+                if code_rate_bulk_2 > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_bulk_2)))
+                    mantissa = code_rate_bulk_2 / (10 ** power_of_ten)
+                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Bulk", f"{code_rate_bulk_2:.3f}")
+
         else:
             st.write("No data available with current filter settings.")
 
