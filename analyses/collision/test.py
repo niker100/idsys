@@ -57,9 +57,14 @@ def run_analysis(patterns):
     return all_results
 
 def plot_pdfs(all_results, patterns, systems):
-    """Plot the PDFs with empirical false positive rates and example messages."""
+    """Plot the PDFs with empirical false positive rates and example messages.
+    Creates separate SVGs for message patterns and each system's tag PDF.
+    """
     outdir = "analyses/collision"
     os.makedirs(outdir, exist_ok=True)
+    
+    # Create CSV data for dashboard
+    csv_data = []
 
     from framework.core import generate_structured_messages
 
@@ -91,15 +96,20 @@ def plot_pdfs(all_results, patterns, systems):
     })
 
     for pattern in patterns:
+        if pattern not in all_results:
+            continue
+            
         msg_pdf = all_results[pattern][0]['message_pdf']
         all_symbols = list(range(256))
         msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
+        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
 
-        fig = plt.figure(figsize=(30, 10))
-        gs = fig.add_gridspec(2, len(systems) + 1, height_ratios=[0.8, 2.2], hspace=0.4, wspace=0.25)
+        # 1. Create the message example and PDF plot
+        fig_msg = plt.figure(figsize=(15, 10))
+        gs_msg = fig_msg.add_gridspec(2, 1, height_ratios=[0.8, 1.2], hspace=0.3)
 
         # Example messages (top row)
-        ax_examples = fig.add_subplot(gs[0, :])
+        ax_examples = fig_msg.add_subplot(gs_msg[0, 0])
         vec_len = 16
         gf_exp = 8
         example_gen = generate_structured_messages(
@@ -123,7 +133,7 @@ def plot_pdfs(all_results, patterns, systems):
             ax_examples.set_yticklabels([f"Example {i+1}" for i in range(len(examples))])
             ax_examples.set_xticks(range(0, vec_len, 2))
             ax_examples.set_xticklabels([str(x) for x in range(0, vec_len, 2)])
-            cbar = fig.colorbar(im, ax=ax_examples, orientation='horizontal', pad=0.18, fraction=0.08, aspect=30)
+            cbar = fig_msg.colorbar(im, ax=ax_examples, orientation='horizontal', pad=0.18, fraction=0.08, aspect=30)
             cbar.set_label('Byte Value')
         else:
             ax_examples.text(0.5, 0.5, f"No example messages available for '{pattern}'",
@@ -132,47 +142,78 @@ def plot_pdfs(all_results, patterns, systems):
             ax_examples.set_yticks([])
             ax_examples.axis('off')
 
-        # Message PDF (bottom left)
-        ax_msg = fig.add_subplot(gs[1, 0])
+        # Message PDF (bottom)
+        ax_msg = fig_msg.add_subplot(gs_msg[1, 0])
         nonzero = np.count_nonzero(msg_probs)
         color = '#2C3E50'
         ax_msg.plot(all_symbols, msg_probs, marker='.', linestyle='-', linewidth=1.1, color=color, label='Message PDF')
         ax_msg.fill_between(all_symbols, msg_probs, alpha=0.15, color=color)
-        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
         ax_msg.set_title(f"Message PDF\nKL div: {msg_kl_div:.3f}", fontweight='bold', pad=8)
         ax_msg.set_xlabel("Symbol Value")
         ax_msg.set_ylabel("Probability")
-        #ax_msg.set_xlim(0, 255)
         ax_msg.set_ylim(0, max(msg_probs) * 1.15 if nonzero > 1 else 1.05)
         ax_msg.grid(True, alpha=0.3)
         ax_msg.legend(loc='upper right', frameon=False)
 
-        # Tag PDFs for each system (bottom row)
-        for idx, (system_name, result) in enumerate(zip(systems, all_results[pattern])):
-            tag_pdf = result['tag_pdf']
+        plt.suptitle(f"Message Pattern: '{pattern}'", fontsize=15, fontweight='bold', y=0.98)
+        plt.subplots_adjust(top=0.90, bottom=0.08, left=0.1, right=0.95)
+        plt.savefig(f"{outdir}/pdf_{pattern}_message.svg", format='svg')
+        plt.close(fig_msg)
+
+        # 2. Create separate plots for each system's tag PDF
+        for idx, system_name in enumerate(systems):
+            if idx >= len(all_results[pattern]):
+                continue
+                
+            result = all_results[pattern][idx]
+            tag_pdf = result.get('tag_pdf', {})
+            if not tag_pdf:
+                continue
+                
             tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
             nonzero_tag = np.count_nonzero(tag_probs)
-            ax_tag = fig.add_subplot(gs[1, idx + 1])
+            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
+            empirical_fpr = result.get('false_positive_rate', 0)
+            unique_tags = len(tag_pdf)
+            total_messages = result.get('total_messages', 0)
+            
+            # Add to CSV data
+            csv_data.append({
+                'pattern': pattern,
+                'system': system_name,
+                'false_positive_rate': empirical_fpr,
+                'unique_tags': unique_tags,
+                'tag_kl_divergence': tag_kl_div,
+                'message_kl_divergence': msg_kl_div,
+                'total_messages': total_messages,
+                'avg_hamming_distance': result.get('avg_hamming_distance', 0),
+                'collisions_avg_hamming_distance': result.get('collisions_avg_hamming_distance', 0)
+            })
+            
+            # Create figure for this system
+            fig_sys = plt.figure(figsize=(10, 6))
+            ax_tag = fig_sys.add_subplot(111)
             ax_tag.plot(all_symbols, tag_probs, marker='.', linestyle='-', linewidth=1.1, color='#E74C3C', label='Tag PDF')
             ax_tag.fill_between(all_symbols, tag_probs, alpha=0.15, color='#E74C3C')
-            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
-            empirical_fpr = result['false_positive_rate']
-            ax_tag.set_title(f"{system_name}\nKL div: {tag_kl_div:.3f}\nEmpirical FPR: {empirical_fpr:.6f}", fontweight='bold', pad=8)
+            
+            ax_tag.set_title(f"System: {system_name}\nKL div: {tag_kl_div:.3f}\nEmpirical FPR: {empirical_fpr:.6f}\nUnique Tags: {unique_tags}", 
+                            fontweight='bold', pad=8)
             ax_tag.set_xlabel("Symbol Value")
-            if idx == 0:
-                ax_tag.set_ylabel("Probability")
-            else:
-                ax_tag.set_ylabel("")
-            #ax_tag.set_xlim(0, 255)
+            ax_tag.set_ylabel("Probability")
             ax_tag.set_ylim(0, max(tag_probs) * 1.15 if nonzero_tag > 1 else 1.05)
             ax_tag.grid(True, alpha=0.3)
             ax_tag.legend(loc='upper right', frameon=False)
 
-        plt.suptitle(f"Probability Distribution Functions for '{pattern}' Pattern", fontsize=15, fontweight='bold', y=0.98)
-        plt.subplots_adjust(top=0.90, bottom=0.08, left=0.06, right=0.98)
-        plt.savefig(f"{outdir}/pdf_{pattern}.svg", format='svg')
-        plt.close()
-
+            plt.suptitle(f"Tag PDF for '{pattern}' Pattern", fontsize=15, fontweight='bold', y=0.98)
+            plt.subplots_adjust(top=0.85, bottom=0.15, left=0.12, right=0.95)
+            plt.savefig(f"{outdir}/pdf_{pattern}_{system_name}.svg", format='svg')
+            plt.close(fig_sys)
+    
+    # Save CSV data for dashboard
+    import pandas as pd
+    pd.DataFrame(csv_data).to_csv(f"{outdir}/collision_analysis_metrics.csv", index=False)
+    print(f"Metrics CSV saved to {outdir}/collision_analysis_metrics.csv")
+    
 def print_fpr_comparison(all_results, patterns, systems):
     """Print a summary table comparing theoretical vs empirical FPRs."""
     print("\n" + "=" * 70)
