@@ -137,10 +137,10 @@ def create_parameter_sets():
                         
                         # Use fewer messages for multi-tag and multi-validation tests
                         adjusted_messages = ANALYSIS_CONFIG["num_messages"]
-                        if tag_count > 1:
-                            adjusted_messages //= tag_count
-                        if num_validation_messages > 10:
-                            adjusted_messages //= (num_validation_messages // 10)
+                        # if tag_count > 1:
+                        #     adjusted_messages //= tag_count
+                        # if num_validation_messages > 10:
+                        #     adjusted_messages //= (num_validation_messages // 10)
                         
                         # Add the parameter set
                         parameter_sets.append({
