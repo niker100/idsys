@@ -22,7 +22,7 @@ data = pd.read_csv(benchmark_file)
 st.set_page_config(layout="wide")
 
 # Add a sidebar for navigation
-dashboards = ["Code Rate vs. FP Rate Tradeoff", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
+dashboards = ["FP Rate in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
 selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
 
 # Streamlit UI
@@ -214,8 +214,8 @@ if selected_dashboard == "PDF & Example Explorer":
                 
                 st.altair_chart((tag_area + tag_chart), use_container_width=True)
 
-# Handle code rate vs. false positive rate tradeoff and execution time dashboards
-elif selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
+# Handle FP Rate in k Identification dashboard
+elif selected_dashboard == "FP Rate in k Identification":
 
     # Filter data for false positive rate
     filtered_data = data[data["test_type"] == "false_positive_rate"]
@@ -226,40 +226,60 @@ elif selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
     with col1:
         st.subheader("Controls")
 
-        # Select system type
+        # Select system types
         system_types = sorted(data["system_type"].unique())
-        selected_system = st.selectbox("Select system type:", system_types)
+        # Select system type 1
+        selected_system_1 = st.selectbox("Select system type 1:", system_types)
+        # Select system type 2
+        selected_system_2 = st.selectbox("Select system type 2:", system_types)
+
+        if selected_system_1 == selected_system_2:
+            st.warning("Please select two different system types for comparison.")
         
         # Filter data by selected system type
-        filtered_data = data[data["system_type"] == selected_system]
+        filtered_data_1 = data[data["system_type"] == selected_system_1]
+        filtered_data_2 = data[data["system_type"] == selected_system_2]
         
         # Select GF exponent
-        gf_exps = sorted(filtered_data["gf_exp"].unique())
+        # Only show GF exponents present in both datasets
+        gf_exps_1 = set(filtered_data_1["gf_exp"].unique())
+        gf_exps_2 = set(filtered_data_2["gf_exp"].unique())
+        gf_exps = sorted(gf_exps_1 & gf_exps_2)
         if gf_exps:
             selected_gf_exp = st.selectbox("Select GF exponent:", gf_exps)
-            filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
-        
+            filtered_data_1 = filtered_data_1[filtered_data_1["gf_exp"] == selected_gf_exp]
+            filtered_data_2 = filtered_data_2[filtered_data_2["gf_exp"] == selected_gf_exp]
+
         # Select number of tags
-        num_tags = sorted(filtered_data["num_tags"].unique())
+        # Only show num_tags present in both datasets
+        num_tags_1 = set(filtered_data_1["num_tags"].unique())
+        num_tags_2 = set(filtered_data_2["num_tags"].unique())
+        num_tags = sorted(num_tags_1 & num_tags_2)
         if num_tags:
             selected_tag = st.radio(
                 "Select number of tags:",
                 num_tags,
                 format_func=lambda x: f"Tags: {x}"
             )
-            filtered_data = filtered_data[filtered_data["num_tags"] == selected_tag]
-        
+            filtered_data_1 = filtered_data_1[filtered_data_1["num_tags"] == selected_tag]
+            filtered_data_2 = filtered_data_2[filtered_data_2["num_tags"] == selected_tag]
+
         # Select message pattern
-        patterns = sorted(filtered_data["message_pattern"].unique())
+        patterns = sorted(filtered_data_1["message_pattern"].unique())
         if patterns:
             selected_pattern = st.selectbox("Message pattern:", patterns)
-            filtered_data = filtered_data[filtered_data["message_pattern"] == selected_pattern]
-        
+            filtered_data_1 = filtered_data_1[filtered_data_1["message_pattern"] == selected_pattern]
+            filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
+
         # Pivot data for plotting multiple lines based on test_type
-        if not filtered_data.empty:
+        if not filtered_data_1.empty and not filtered_data_2.empty:
+
+            # combine the two filtered datasets
+            filtered_data = pd.concat([filtered_data_1, filtered_data_2])
+
             pivot_fp_rate = filtered_data.pivot_table(
                 index="num_validation_messages",
-                columns="vec_len",
+                columns="system_type",
                 values="false_positive_rate"
             ).sort_index()
             
@@ -267,7 +287,7 @@ elif selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
             code_rate_col = "code_rate_bulk" if "code_rate_bulk" in filtered_data.columns else "code_rate"
             pivot_code_rate = filtered_data.pivot_table(
                 index="num_validation_messages",
-                columns="vec_len",
+                columns="system_type",
                 values=code_rate_col
             ).sort_index()
             
