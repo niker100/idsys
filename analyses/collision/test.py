@@ -84,6 +84,10 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
         msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
         # Calculate KL divergence for message PDF
         msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
+        # Save the false positive rate for each system in a dict
+        fp_rates = {}
+        for idx, system_name in enumerate(systems):
+            fp_rates[system_name] = all_results[pattern][idx]['false_positive_rate']
         vec_len = 16
         gf_exp = 8
         example_gen = generate_structured_messages(
@@ -99,13 +103,16 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
                 examples.append(next(example_gen))
         except StopIteration:
             pass
-        # Save message PDF, examples, and KL divergence
+        # Save message PDF, examples, KL divergence, and fp rates
         row = {
             "pattern": pattern,
             "msg_pdf": msg_probs,
             "examples": examples,
             "msg_kl_div": msg_kl_div
         }
+        # Add fp rates for each system
+        for system_name in systems:
+            row[f"fp_rate_{system_name}"] = fp_rates[system_name]
         # Save tag PDFs and KL divergence for each system
         for idx, system_name in enumerate(systems):
             tag_pdf = all_results[pattern][idx]['tag_pdf']
