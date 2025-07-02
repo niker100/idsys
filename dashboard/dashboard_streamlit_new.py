@@ -233,8 +233,8 @@ elif selected_dashboard == "FP Rate in k Identification":
         # Select system type 2
         selected_system_2 = st.selectbox("Select system type 2:", system_types)
 
-        if selected_system_1 == selected_system_2:
-            st.warning("Please select two different system types for comparison.")
+        #if selected_system_1 == selected_system_2:
+            #st.warning("Please select two different system types for comparison.")
         
         # Filter data by selected system type
         filtered_data_1 = data[data["system_type"] == selected_system_1]
@@ -271,6 +271,15 @@ elif selected_dashboard == "FP Rate in k Identification":
             filtered_data_1 = filtered_data_1[filtered_data_1["message_pattern"] == selected_pattern]
             filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
 
+        if selected_pattern == "random":
+            st.markdown("random explanation")
+        elif selected_pattern == "low_entropy":
+            st.markdown("low_entropy explanation")
+        elif selected_pattern == "sparse":
+            st.markdown("sparse explanation")
+        
+
+
         # Pivot data for plotting multiple lines based on test_type
         if not filtered_data_1.empty and not filtered_data_2.empty:
 
@@ -290,16 +299,7 @@ elif selected_dashboard == "FP Rate in k Identification":
                 columns="system_type",
                 values=code_rate_col
             ).sort_index()
-            
-            # Display metrics
-            st.markdown(
-                f"<span style='font-size:14px;'>vec_len range: {filtered_data['vec_len'].min()} - {filtered_data['vec_len'].max()}</span>",
-                unsafe_allow_html=True
-            )
-            st.markdown(
-                f"<span style='font-size:14px;'>avg messages: {filtered_data['num_messages'].mean():.0f}</span>",
-                unsafe_allow_html=True
-            )
+
 
     with col2:
         st.subheader("False Positive Rate")
@@ -323,6 +323,22 @@ elif selected_dashboard == "FP Rate in k Identification":
                 .properties(width=700, height=400)
             )
             st.altair_chart(chart, use_container_width=True)
+
+            # Display metrics
+            st.markdown(
+                f"<span style='font-size:14px;'>vec_len range: {filtered_data['vec_len'].min()} - {filtered_data['vec_len'].max()}</span>",
+                unsafe_allow_html=True
+            )
+            avg_messages = filtered_data['num_messages'].mean()
+            if avg_messages > 0:
+                power_of_ten = int(np.floor(np.log10(avg_messages)))
+            else:
+                power_of_ten = 0
+            st.markdown(
+                f"<span style='font-size:14px;'>avg messages: 10<sup>{power_of_ten}</sup></span>",
+                unsafe_allow_html=True
+            )
+            
         else:
             st.write("No data available with current filter settings.")
 
@@ -350,6 +366,8 @@ elif selected_dashboard == "FP Rate in k Identification":
             st.altair_chart(chart, use_container_width=True)
         else:
             st.write("No data available with current filter settings.")
+
+    
 
 # Handle execution time vs. vector length dashboard
 elif selected_dashboard == "Execution Time vs. vec_len":
