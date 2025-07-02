@@ -22,7 +22,7 @@ data = pd.read_csv(benchmark_file)
 st.set_page_config(layout="wide")
 
 # Add a sidebar for navigation
-dashboards = ["Code Rate vs. FP Rate Tradeoff", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
+dashboards = ["FP Rate in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
 selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
 
 # Streamlit UI
@@ -221,272 +221,453 @@ if selected_dashboard == "PDF & Example Explorer":
                 
                 st.altair_chart((tag_area + tag_chart), use_container_width=True)
 
-else:
-    # Original layout for other dashboards
+# Handle FP Rate in k Identification dashboard
+elif selected_dashboard == "FP Rate in k Identification":
+
+    # Filter data for false positive rate
+    filtered_data = data[data["test_type"] == "false_positive_rate"]
+
     # Create three columns: controls and chart
     col1, col2, col3 = st.columns([1, 2, 2])  # Adjust ratio as needed
 
-    # Filter by test_type
-    if selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
-        # We need false_positive_rate data for this dashboard
-        filtered_data = data[data["test_type"] == "false_positive_rate"]
-    elif selected_dashboard == "Execution Time vs. vec_len":
-        # We need execution_time data for this dashboard
-        filtered_data = data[data["test_type"] == "execution_time"]
-    else:
-        # For system comparison, use execution time data as default
-        filtered_data = data[data["test_type"] == "execution_time"]
-
-    # --- Controls Section (Left Column) ---
     with col1:
         st.subheader("Controls")
 
-        # Controls for "Code Rate vs. FP Rate Tradeoff" dashboard
-        if selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
-            # Select system type
-            system_types = sorted(filtered_data["system_type"].unique())
-            selected_system = st.selectbox("Select system type:", system_types)
-            
-            # Further filter by system type
-            filtered_data = filtered_data[filtered_data["system_type"] == selected_system]
-            
-            # Select GF exponent
-            gf_exps = sorted(filtered_data["gf_exp"].unique())
-            if gf_exps:
-                selected_gf_exp = st.selectbox("Select GF exponent:", gf_exps)
-                filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
-            
-            # Select number of tags
-            num_tags = sorted(filtered_data["num_tags"].unique())
-            if num_tags:
-                selected_tag = st.radio(
-                    "Select number of tags:",
-                    num_tags,
-                    format_func=lambda x: f"Tags: {x}"
-                )
-                filtered_data = filtered_data[filtered_data["num_tags"] == selected_tag]
-            
-            # Select message pattern
-            patterns = sorted(filtered_data["message_pattern"].unique())
-            if patterns:
-                selected_pattern = st.selectbox("Message pattern:", patterns)
-                filtered_data = filtered_data[filtered_data["message_pattern"] == selected_pattern]
-            
-            # Pivot data for plotting multiple lines based on test_type
-            if not filtered_data.empty:
-                pivot_fp_rate = filtered_data.pivot_table(
-                    index="num_validation_messages",
-                    columns="vec_len",
-                    values="false_positive_rate"
-                ).sort_index()
-                
-                # Choose code rate column (use code_rate_bulk if available)
-                code_rate_col = "code_rate_bulk" if "code_rate_bulk" in filtered_data.columns else "code_rate"
-                pivot_code_rate = filtered_data.pivot_table(
-                    index="num_validation_messages",
-                    columns="vec_len",
-                    values=code_rate_col
-                ).sort_index()
-                
-                # Display metrics
-                st.markdown(
-                    f"<span style='font-size:14px;'>vec_len range: {filtered_data['vec_len'].min()} - {filtered_data['vec_len'].max()}</span>",
-                    unsafe_allow_html=True
-                )
-                st.markdown(
-                    f"<span style='font-size:14px;'>avg messages: {filtered_data['num_messages'].mean():.0f}</span>",
-                    unsafe_allow_html=True
-                )
+        # Select system types
+        system_types = sorted(data["system_type"].unique())
+        # Select system type 1
+        selected_system_1 = st.selectbox("Select system type 1:", system_types)
+        # Select system type 2
+        selected_system_2 = st.selectbox("Select system type 2:", system_types)
 
-        # Controls for "Execution Time vs. vec_len" dashboard
-        if selected_dashboard == "Execution Time vs. vec_len":
-            # Select system type
-            system_types = sorted(filtered_data["system_type"].unique())
-            selected_system = st.selectbox("Select system type:", system_types)
+        #if selected_system_1 == selected_system_2:
+            #st.warning("Please select two different system types for comparison.")
+        
+        # Filter data by selected system type
+        filtered_data_1 = data[data["system_type"] == selected_system_1]
+        filtered_data_2 = data[data["system_type"] == selected_system_2]
+        
+        # Select GF exponent
+        # Only show GF exponents present in both datasets
+        gf_exps_1 = set(filtered_data_1["gf_exp"].unique())
+        gf_exps_2 = set(filtered_data_2["gf_exp"].unique())
+        gf_exps = sorted(gf_exps_1 & gf_exps_2)
+        if gf_exps:
+            selected_gf_exp = st.selectbox("Select GF exponent:", gf_exps)
+            filtered_data_1 = filtered_data_1[filtered_data_1["gf_exp"] == selected_gf_exp]
+            filtered_data_2 = filtered_data_2[filtered_data_2["gf_exp"] == selected_gf_exp]
+
+        # Select number of tags
+        # Only show num_tags present in both datasets
+        num_tags_1 = set(filtered_data_1["num_tags"].unique())
+        num_tags_2 = set(filtered_data_2["num_tags"].unique())
+        num_tags = sorted(num_tags_1 & num_tags_2)
+        if num_tags:
+            selected_tag = st.radio(
+                "Select number of tags:",
+                num_tags,
+                format_func=lambda x: f"Tags: {x}"
+            )
+            filtered_data_1 = filtered_data_1[filtered_data_1["num_tags"] == selected_tag]
+            filtered_data_2 = filtered_data_2[filtered_data_2["num_tags"] == selected_tag]
+
+        # Select message pattern
+        patterns = sorted(filtered_data_1["message_pattern"].unique())
+        if patterns:
+            selected_pattern = st.selectbox("Message pattern:", patterns)
+            filtered_data_1 = filtered_data_1[filtered_data_1["message_pattern"] == selected_pattern]
+            filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
+
+        if selected_pattern == "random":
+            st.markdown("random explanation")
+        elif selected_pattern == "low_entropy":
+            st.markdown("low_entropy explanation")
+        elif selected_pattern == "sparse":
+            st.markdown("sparse explanation")
+        
+
+        # Pivot data for plotting multiple lines based on test_type
+        if not filtered_data_1.empty and not filtered_data_2.empty:
+
+            # combine the two filtered datasets
+            filtered_data = pd.concat([filtered_data_1, filtered_data_2])
+
+            pivot_fp_rate = filtered_data.pivot_table(
+                index="num_validation_messages",
+                columns="system_type",
+                values="false_positive_rate"
+            ).sort_index()
+
+
+    with col2:
+        st.subheader("False Positive Rate")
+        if not filtered_data.empty and 'pivot_fp_rate' in locals():
+            # Line chart for false positive rate by vector length
+            chart_data = pivot_fp_rate.reset_index().melt(
+                'num_validation_messages',
+                var_name='vec_len',
+                value_name='false_positive_rate'
+            )
             
-            # Filter by system type
-            filtered_data = filtered_data[filtered_data["system_type"] == selected_system]
-            
-            # Select GF exponent
-            gf_exps = sorted(filtered_data["gf_exp"].unique())
-            if gf_exps:
-                selected_gf_exp = st.radio(
-                    "Select GF exponent:",
-                    gf_exps,
-                    format_func=lambda x: f"GF(2^{x})"
+            chart = (
+                alt.Chart(chart_data)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X(
+                        "num_validation_messages:Q",
+                        title="Number of Validation Messages",
+                        scale=alt.Scale(type='log', base=2)
+                    ),
+                    y=alt.Y(
+                        "false_positive_rate:Q",
+                        title="False Positive Rate",
+                        scale=alt.Scale(type='log', base=10)
+                    ),
+                    color=alt.Color("vec_len:N", legend=alt.Legend(title="Vector Length", orient="bottom")),
+                    tooltip=["num_validation_messages:Q", "vec_len:N", "false_positive_rate:Q"]
                 )
-                filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
-            
-            # Select number of tags
-            num_tags = sorted(filtered_data["num_tags"].unique())
-            if num_tags:
-                selected_num_tags = st.selectbox("Number of tags:", num_tags)
-                filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
-            
+                .properties(width=700, height=400)
+            )
+            st.altair_chart(chart, use_container_width=True)
+
             # Display metrics
             st.markdown(
-                f"<span style='font-size:14px;'>number of messages: {filtered_data['num_messages'].mean():.0f}</span>",
+                f"<span style='font-size:14px;'>vec_len range: {filtered_data['vec_len'].min()} - {filtered_data['vec_len'].max()}</span>",
                 unsafe_allow_html=True
             )
-        
-        # Controls for "System Type Comparison" dashboard
-        if selected_dashboard == "System Type Comparison":
-            # Select GF exponent
-            gf_exps = sorted(filtered_data["gf_exp"].unique())
-            if gf_exps:
-                selected_gf_exp = st.radio(
-                    "Select GF exponent:",
-                    gf_exps,
-                    format_func=lambda x: f"GF(2^{x})"
-                )
-                filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
+            avg_messages = filtered_data['num_messages'].mean()
+            if avg_messages > 0:
+                power_of_ten = int(np.floor(np.log10(avg_messages)))
+            else:
+                power_of_ten = 0
+            st.markdown(
+                f"<span style='font-size:14px;'>avg messages: 10<sup>{power_of_ten}</sup></span>",
+                unsafe_allow_html=True
+            )
             
-            # Select number of tags
-            num_tags = sorted(filtered_data["num_tags"].unique())
-            if num_tags:
-                selected_num_tags = st.selectbox("Number of tags:", num_tags)
-                filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
-                
-            # Filter to single-tag systems for fair comparison
-            filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
+        else:
+            st.write("No data available with current filter settings.")
 
-    # --- Chart and Metrics Section (Middle Column) ---
+    with col3:
+        if not filtered_data_1.empty and not filtered_data_2.empty:
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.subheader(f"Code Rate for {selected_system_1}")
+
+                # Display metrics for first system type
+                code_rate_subseq = filtered_data_1['code_rate_subsequently'].mean()
+                if code_rate_subseq > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_subseq)))
+                    mantissa = code_rate_subseq / (10 ** power_of_ten)
+                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Subsequently", f"{code_rate_subseq:.3f}")
+                
+                code_rate_bulk = filtered_data_1['code_rate_bulk'].mean()
+                if code_rate_bulk > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_bulk)))
+                    mantissa = code_rate_bulk / (10 ** power_of_ten)
+                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Bulk", f"{code_rate_bulk:.3f}")
+
+            with col2:
+
+                st.subheader(f"Code Rate for {selected_system_2}")
+
+                # Display metrics for second system type
+                code_rate_subseq_2 = filtered_data_2['code_rate_subsequently'].mean()
+                if code_rate_subseq_2 > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_subseq_2)))
+                    mantissa = code_rate_subseq_2 / (10 ** power_of_ten)
+                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Subsequently", f"{code_rate_subseq_2:.3f}")
+
+                code_rate_bulk_2 = filtered_data_2['code_rate_bulk'].mean()
+                if code_rate_bulk_2 > 0:
+                    power_of_ten = int(np.floor(np.log10(code_rate_bulk_2)))
+                    mantissa = code_rate_bulk_2 / (10 ** power_of_ten)
+                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
+                else:
+                    st.metric("Code Rate Bulk", f"{code_rate_bulk_2:.3f}")
+
+        else:
+            st.write("No data available with current filter settings.")
+
+# Handle execution time vs. vector length dashboard
+elif selected_dashboard == "Execution Time vs. vec_len":
+    # Filter data for execution time
+    filtered_data = data[data["test_type"] == "execution_time"]
+
+    # Create three columns: controls and chart
+    col1, col2, col3 = st.columns([1, 2, 2])  # Adjust ratio as needed
+
+    with col1:
+        st.subheader("Controls")
+
+        # Select system type
+        system_types = sorted(filtered_data["system_type"].unique())
+        selected_system_1 = st.selectbox("Select system type 1:", system_types)
+        selected_system_2 = st.selectbox("Select system type 2:", system_types)
+
+        # Filter data by selected system type
+        filtered_data_1 = filtered_data[filtered_data["system_type"] == selected_system_1]
+        filtered_data_2 = filtered_data[filtered_data["system_type"] == selected_system_2]
+
+        # Select GF exponent
+        # Only show GF exponents present in both datasets
+        gf_exps = sorted(set(filtered_data_1["gf_exp"].unique()) & set(filtered_data_2["gf_exp"].unique()))
+        if gf_exps:
+            selected_gf_exp = st.radio(
+                "Select GF exponent:",
+                gf_exps,
+                format_func=lambda x: f"GF(2^{x})"
+            )
+            filtered_data_1 = filtered_data_1[filtered_data_1["gf_exp"] == selected_gf_exp]
+            filtered_data_2 = filtered_data_2[filtered_data_2["gf_exp"] == selected_gf_exp]
+
+        # Select number of tags
+        # Only show num_tags present in both datasets
+        num_tags = sorted(set(filtered_data_1["num_tags"].unique()) & set(filtered_data_2["num_tags"].unique()))
+        if num_tags:
+            selected_num_tags = st.radio(
+                "Number of tags:",
+                num_tags,
+                format_func=lambda x: f"Tags: {x}"
+            )
+            filtered_data_1 = filtered_data_1[filtered_data_1["num_tags"] == selected_num_tags]
+            filtered_data_2 = filtered_data_2[filtered_data_2["num_tags"] == selected_num_tags]
+
+        # Display metrics
+        avg_messages = filtered_data['num_messages'].mean()
+        if avg_messages > 0:
+            power_of_ten = int(np.floor(np.log10(avg_messages)))
+        else:
+            power_of_ten = 0
+        st.markdown(
+            f"<span style='font-size:14px;'>avg messages: 10<sup>{power_of_ten}</sup></span>",
+            unsafe_allow_html=True
+        )
+
+        if not filtered_data_1.empty and not filtered_data_2.empty:
+            # Combine the two filtered datasets
+            filtered_data = pd.concat([filtered_data_1, filtered_data_2])
+
+            # Pivot data for plotting multiple lines based on vec_len
+            pivot_execution_time = filtered_data.pivot_table(
+                index="vec_len",
+                values="avg_execution_time_ms",
+                columns="system_type",
+                aggfunc="mean"
+            )
+
+            pivot_throughput = filtered_data.pivot_table(
+                index="vec_len",
+                values="throughput_msgs_per_sec",
+                columns="system_type",
+                aggfunc="mean"
+            )
+
     with col2:
-        if selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
-            st.subheader("False Positive Rate")
-            if not filtered_data.empty and 'pivot_fp_rate' in locals():
-                # Line chart for false positive rate by vector length
-                chart_data = pivot_fp_rate.reset_index().melt(
-                    'num_validation_messages',
-                    var_name='vec_len',
-                    value_name='false_positive_rate'
-                )
-                
-                chart = (
-                    alt.Chart(chart_data)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("num_validation_messages:Q", title="Number of Validation Messages"),
-                        y=alt.Y("false_positive_rate:Q", title="False Positive Rate"),
-                        color=alt.Color("vec_len:N", legend=alt.Legend(title="Vector Length", orient="bottom")),
-                        tooltip=["num_validation_messages:Q", "vec_len:N", "false_positive_rate:Q"]
-                    )
-                    .properties(width=700, height=400)
-                )
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.write("No data available with current filter settings.")
-
-        if selected_dashboard == "Execution Time vs. vec_len":
-            st.subheader("Execution Time vs. Vector Length")
-            
-            if not filtered_data.empty:
-                # Line chart for execution time vs. vec_len
-                chart = (
-                    alt.Chart(filtered_data)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("vec_len:Q", title="Vector Length", scale=alt.Scale(type='log', base=2)),
-                        y=alt.Y("avg_execution_time_ms:Q", title="Average Execution Time (ms)", scale=alt.Scale(type='log')),
-                        tooltip=["vec_len:Q", "avg_execution_time_ms:Q", "system_type:N", "num_tags:Q"]
-                    )
-                    .properties(width=700, height=400)
-                )
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.write("No data available for the selected system and parameters.")
+        st.subheader("Execution Time vs. Vector Length")
         
-        if selected_dashboard == "System Type Comparison":
+        if not pivot_execution_time.empty:
+            # Line chart for execution time vs. vec_len
+            chart_data = pivot_execution_time.reset_index().melt(
+                id_vars=["vec_len"],
+                var_name="system_type",
+                value_name="avg_execution_time_ms"
+            )
+            
+            # Determine min/max for both axis across all relevant data
+            min_vec_len = data["vec_len"].min()
+            max_vec_len = data["vec_len"].max()
+            min_exec_time = data["avg_execution_time_ms"].min()
+            max_exec_time = data["avg_execution_time_ms"].max()
+
+            # Set some padding for better visualization
+            x_domain_vec_len = [min_vec_len, max_vec_len*1.1]
+            y_domain_execution_time = [min_exec_time * 0.8, max_exec_time * 1.2]
+
+            chart = (
+                alt.Chart(chart_data)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X(
+                        "vec_len:Q",
+                        title="Vector Length",
+                        scale=alt.Scale(type='log', base=2, domain=x_domain_vec_len)
+                    ),
+                    y=alt.Y(
+                        "avg_execution_time_ms:Q",
+                        title="Average Execution Time (ms)",
+                        scale=alt.Scale(type='log', domain=y_domain_execution_time)
+                    ),
+                    color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
+                    tooltip=["vec_len:Q", "avg_execution_time_ms:Q", "system_type:N", "num_tags:Q"]
+                )
+                .properties(width=700, height=400)
+            )
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.write("No data available for the selected system and parameters.")
+
+    with col3:
+        st.subheader("Throughput vs. Vector Length")
+
+        if not pivot_throughput.empty:
+
+            # Determine min/max for y axis across all relevant data
+            min_throughput = data["throughput_msgs_per_sec"].min()
+            max_throughput = data["throughput_msgs_per_sec"].max()
+
+            # Set some padding for better visualization
+            y_domain_throughput = [min_throughput * 0.8, max_throughput * 1.2]
+
+            # Line chart for throughput vs. vec_len
+            chart_data = pivot_throughput.reset_index().melt(
+                id_vars=["vec_len"],
+                var_name="system_type",
+                value_name="throughput_msgs_per_sec"
+            )
+            chart = (
+                alt.Chart(chart_data)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X(
+                        "vec_len:Q",
+                        title="Vector Length",
+                        scale=alt.Scale(type='log', base=2, domain=x_domain_vec_len)
+                    ),
+                    y=alt.Y(
+                        "throughput_msgs_per_sec:Q",
+                        title="Messages Per Second (throughput)",
+                        scale=alt.Scale(type='log', domain=y_domain_throughput)
+                    ),
+                    color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
+                    tooltip=["vec_len:Q", "throughput_msgs_per_sec:Q", "system_type:N", "num_tags:Q"]
+                )
+                .properties(width=700, height=400)
+            )
+            st.altair_chart(chart, use_container_width=True)
+        else:
+            st.write("No throughput data available.")
+
+# Handle system type comparison dashboard
+elif selected_dashboard == "System Type Comparison":
+    # Filter data for system type comparison
+    filtered_data = data[data["test_type"] == "execution_time"]
+
+    # Create two columns: controls and chart
+    col1, col2 = st.columns([1, 4])  # Adjust ratio as needed
+
+    with col1:
+        st.subheader("Controls")
+
+        # Select GF exponent
+        gf_exps = sorted(filtered_data["gf_exp"].unique())
+        if gf_exps:
+            selected_gf_exp = st.radio(
+                "Select GF exponent:",
+                gf_exps,
+                format_func=lambda x: f"GF(2^{x})"
+            )
+            filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
+        
+        # Select number of tags
+        num_tags = sorted(filtered_data["num_tags"].unique())
+        if num_tags:
+            selected_num_tags = st.radio(
+                "Number of tags:", 
+                num_tags,
+                format_func=lambda x: f"Tags: {x}"
+            )
+            filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
+            
+        # Filter to single-tag systems for fair comparison
+        filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
+
+    with col2:
+
+        # Create three columns for comparison charts
+        col1, col2 = st.columns(2)
+
+        if not filtered_data.empty:
+            # Prepare data for comparison chart - filter for specific vec_len
+            vec_lengths = sorted(filtered_data["vec_len"].unique())
+            if vec_lengths:
+                selected_vec_len = st.select_slider(
+                    "Select vector length:",
+                    options=vec_lengths
+                )
+                comparison_data = filtered_data[filtered_data["vec_len"] == selected_vec_len]
+            else:
+                    st.write("No vector length data available.")
+
+        with col1:
             st.subheader("Execution Time by System Type")
             
             if not filtered_data.empty:
-                # Prepare data for comparison chart - filter for specific vec_len
-                vec_lengths = sorted(filtered_data["vec_len"].unique())
-                if vec_lengths:
-                    selected_vec_len = st.select_slider(
-                        "Select vector length:",
-                        options=vec_lengths
+                # Bar chart comparing system types
+                # Always show all system types on the x-axis, even if some are missing in the filtered data
+                all_system_types = sorted(data["system_type"].unique())
+                max_exec_time = data["avg_execution_time_ms"].max()
+                y_domain_execution_time = [0, max_exec_time * 1.1]
+
+                chart = (
+                    alt.Chart(comparison_data)
+                    .mark_bar()
+                    .encode(
+                        x=alt.X(
+                            "system_type:N",
+                            title="System Type",
+                            sort=all_system_types,
+                            scale=alt.Scale(domain=all_system_types)
+                        ),
+                        y=alt.Y(
+                            "avg_execution_time_ms:Q",
+                            title="Avg Execution Time (ms)",
+                            scale=alt.Scale(domain=y_domain_execution_time)
+                        ),
+                        color=alt.Color("system_type:N", legend=None),
+                        tooltip=["system_type:N", "avg_execution_time_ms:Q", "vec_len:Q"]
                     )
-                    comparison_data = filtered_data[filtered_data["vec_len"] == selected_vec_len]
-                    
-                    # Bar chart comparing system types
-                    chart = (
-                        alt.Chart(comparison_data)
-                        .mark_bar()
-                        .encode(
-                            x=alt.X("system_type:N", title="System Type"),
-                            y=alt.Y("avg_execution_time_ms:Q", title="Avg Execution Time (ms)"),
-                            color="system_type:N",
-                            tooltip=["system_type:N", "avg_execution_time_ms:Q", "vec_len:Q"]
-                        )
-                        .properties(width=700, height=400)
-                    )
-                    st.altair_chart(chart, use_container_width=True)
-                else:
-                    st.write("No vector length data available.")
+                    .properties(width=700, height=400)
+                )
+                st.altair_chart(chart, use_container_width=True)
             else:
                 st.write("No data available for comparison.")
 
-    # --- Chart and Metrics Section (Right Column) ---
-    with col3:
-        if selected_dashboard == "Code Rate vs. FP Rate Tradeoff":
-            st.subheader("Code Rate")
-            if not filtered_data.empty and 'pivot_code_rate' in locals():
-                # Line chart for code rate by vector length
-                chart_data = pivot_code_rate.reset_index().melt(
-                    'num_validation_messages',
-                    var_name='vec_len',
-                    value_name='code_rate'
-                )
-                
-                chart = (
-                    alt.Chart(chart_data)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("num_validation_messages:Q", title="Number of Validation Messages"),
-                        y=alt.Y("code_rate:Q", title="Code Rate"),
-                        color=alt.Color("vec_len:N", legend=alt.Legend(title="Vector Length", orient="bottom")),
-                        tooltip=["num_validation_messages:Q", "vec_len:N", "code_rate:Q"]
-                    )
-                    .properties(width=700, height=400)
-                )
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.write("No data available with current filter settings.")
-
-        if selected_dashboard == "Execution Time vs. vec_len":
-            st.subheader("Throughput vs. Vector Length")
-            
-            if not filtered_data.empty:
-                # Line chart for throughput vs. vec_len
-                chart = (
-                    alt.Chart(filtered_data)
-                    .mark_line(point=True)
-                    .encode(
-                        x=alt.X("vec_len:Q", title="Vector Length", scale=alt.Scale(type='log', base=2)),
-                        y=alt.Y("throughput_msgs_per_sec:Q", title="Messages Per Second", scale=alt.Scale(type='log')),
-                        tooltip=["vec_len:Q", "throughput_msgs_per_sec:Q", "system_type:N"]
-                    )
-                    .properties(width=700, height=400)
-                )
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.write("No throughput data available.")
-        
-        if selected_dashboard == "System Type Comparison":
+        with col2:
             st.subheader("Throughput by System Type")
             
             if not filtered_data.empty:
                 # Use the same vec_len as middle column
                 if 'selected_vec_len' in locals() and 'comparison_data' in locals():
                     # Bar chart comparing throughput
+                    all_system_types = sorted(data["system_type"].unique())
+                    max_throughput = data["throughput_msgs_per_sec"].max()
+                    y_domain_throughput = [0, max_throughput * 1.1]
+
                     chart = (
                         alt.Chart(comparison_data)
                         .mark_bar()
                         .encode(
-                            x=alt.X("system_type:N", title="System Type"),
-                            y=alt.Y("throughput_msgs_per_sec:Q", title="Messages Per Second (throughput)"),
-                            color="system_type:N",
+                            x=alt.X(
+                                "system_type:N",
+                                title="System Type",
+                                sort=all_system_types,
+                                scale=alt.Scale(domain=all_system_types)
+                            ),
+                            y=alt.Y(
+                                "throughput_msgs_per_sec:Q",
+                                title="Messages Per Second (throughput)",
+                                scale=alt.Scale(domain=y_domain_throughput)
+                            ),
+                            color=alt.Color("system_type:N", legend=None),
                             tooltip=["system_type:N", "throughput_msgs_per_sec:Q", "vec_len:Q"]
                         )
                         .properties(width=700, height=400)
@@ -496,6 +677,7 @@ else:
                     st.write("No vector length selected.")
             else:
                 st.write("No throughput data available.")
+
 
 # Add a footer with data info
 st.sidebar.markdown("---")
