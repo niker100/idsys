@@ -474,12 +474,31 @@ elif selected_dashboard == "Execution Time vs. vec_len":
                 var_name="system_type",
                 value_name="avg_execution_time_ms"
             )
+            
+            # Determine min/max for both axis across all relevant data
+            min_vec_len = data["vec_len"].min()
+            max_vec_len = data["vec_len"].max()
+            min_exec_time = data["avg_execution_time_ms"].min()
+            max_exec_time = data["avg_execution_time_ms"].max()
+
+            # Set some padding for better visualization
+            x_domain_vec_len = [min_vec_len, max_vec_len*1.1]
+            y_domain_execution_time = [min_exec_time * 0.8, max_exec_time * 1.2]
+
             chart = (
                 alt.Chart(chart_data)
                 .mark_line(point=True)
                 .encode(
-                    x=alt.X("vec_len:Q", title="Vector Length", scale=alt.Scale(type='log', base=2)),
-                    y=alt.Y("avg_execution_time_ms:Q", title="Average Execution Time (ms)", scale=alt.Scale(type='log')),
+                    x=alt.X(
+                        "vec_len:Q",
+                        title="Vector Length",
+                        scale=alt.Scale(type='log', base=2, domain=x_domain_vec_len)
+                    ),
+                    y=alt.Y(
+                        "avg_execution_time_ms:Q",
+                        title="Average Execution Time (ms)",
+                        scale=alt.Scale(type='log', domain=y_domain_execution_time)
+                    ),
                     color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
                     tooltip=["vec_len:Q", "avg_execution_time_ms:Q", "system_type:N", "num_tags:Q"]
                 )
@@ -491,8 +510,16 @@ elif selected_dashboard == "Execution Time vs. vec_len":
 
     with col3:
         st.subheader("Throughput vs. Vector Length")
-        
-        if not filtered_data.empty:
+
+        if not pivot_throughput.empty:
+
+            # Determine min/max for y axis across all relevant data
+            min_throughput = data["throughput_msgs_per_sec"].min()
+            max_throughput = data["throughput_msgs_per_sec"].max()
+
+            # Set some padding for better visualization
+            y_domain_throughput = [min_throughput * 0.8, max_throughput * 1.2]
+
             # Line chart for throughput vs. vec_len
             chart_data = pivot_throughput.reset_index().melt(
                 id_vars=["vec_len"],
@@ -503,8 +530,16 @@ elif selected_dashboard == "Execution Time vs. vec_len":
                 alt.Chart(chart_data)
                 .mark_line(point=True)
                 .encode(
-                    x=alt.X("vec_len:Q", title="Vector Length", scale=alt.Scale(type='log', base=2)),
-                    y=alt.Y("throughput_msgs_per_sec:Q", title="Messages Per Second (throughput)", scale=alt.Scale(type='log')),
+                    x=alt.X(
+                        "vec_len:Q",
+                        title="Vector Length",
+                        scale=alt.Scale(type='log', base=2, domain=x_domain_vec_len)
+                    ),
+                    y=alt.Y(
+                        "throughput_msgs_per_sec:Q",
+                        title="Messages Per Second (throughput)",
+                        scale=alt.Scale(type='log', domain=y_domain_throughput)
+                    ),
                     color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
                     tooltip=["vec_len:Q", "throughput_msgs_per_sec:Q", "system_type:N", "num_tags:Q"]
                 )
