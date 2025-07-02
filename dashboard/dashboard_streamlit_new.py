@@ -554,8 +554,8 @@ elif selected_dashboard == "System Type Comparison":
     # Filter data for system type comparison
     filtered_data = data[data["test_type"] == "execution_time"]
 
-    # Create three columns: controls and chart
-    col1, col2, col3 = st.columns([1, 2, 2])  # Adjust ratio as needed
+    # Create two columns: controls and chart
+    col1, col2 = st.columns([1, 4])  # Adjust ratio as needed
 
     with col1:
         st.subheader("Controls")
@@ -573,15 +573,21 @@ elif selected_dashboard == "System Type Comparison":
         # Select number of tags
         num_tags = sorted(filtered_data["num_tags"].unique())
         if num_tags:
-            selected_num_tags = st.selectbox("Number of tags:", num_tags)
+            selected_num_tags = st.radio(
+                "Number of tags:", 
+                num_tags,
+                format_func=lambda x: f"Tags: {x}"
+            )
             filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
             
         # Filter to single-tag systems for fair comparison
         filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
 
     with col2:
-        st.subheader("Execution Time by System Type")
-        
+
+        # Create three columns for comparison charts
+        col1, col2 = st.columns(2)
+
         if not filtered_data.empty:
             # Prepare data for comparison chart - filter for specific vec_len
             vec_lengths = sorted(filtered_data["vec_len"].unique())
@@ -591,48 +597,79 @@ elif selected_dashboard == "System Type Comparison":
                     options=vec_lengths
                 )
                 comparison_data = filtered_data[filtered_data["vec_len"] == selected_vec_len]
-                
+            else:
+                    st.write("No vector length data available.")
+
+        with col1:
+            st.subheader("Execution Time by System Type")
+            
+            if not filtered_data.empty:
                 # Bar chart comparing system types
+                # Always show all system types on the x-axis, even if some are missing in the filtered data
+                all_system_types = sorted(data["system_type"].unique())
+                max_exec_time = data["avg_execution_time_ms"].max()
+                y_domain_execution_time = [0, max_exec_time * 1.1]
+
                 chart = (
                     alt.Chart(comparison_data)
                     .mark_bar()
                     .encode(
-                        x=alt.X("system_type:N", title="System Type"),
-                        y=alt.Y("avg_execution_time_ms:Q", title="Avg Execution Time (ms)"),
-                        color="system_type:N",
+                        x=alt.X(
+                            "system_type:N",
+                            title="System Type",
+                            sort=all_system_types,
+                            scale=alt.Scale(domain=all_system_types)
+                        ),
+                        y=alt.Y(
+                            "avg_execution_time_ms:Q",
+                            title="Avg Execution Time (ms)",
+                            scale=alt.Scale(domain=y_domain_execution_time)
+                        ),
+                        color=alt.Color("system_type:N", legend=None),
                         tooltip=["system_type:N", "avg_execution_time_ms:Q", "vec_len:Q"]
                     )
                     .properties(width=700, height=400)
                 )
                 st.altair_chart(chart, use_container_width=True)
             else:
-                st.write("No vector length data available.")
-        else:
-            st.write("No data available for comparison.")
+                st.write("No data available for comparison.")
 
-    with col3:
-        st.subheader("Throughput by System Type")
-        
-        if not filtered_data.empty:
-            # Use the same vec_len as middle column
-            if 'selected_vec_len' in locals() and 'comparison_data' in locals():
-                # Bar chart comparing throughput
-                chart = (
-                    alt.Chart(comparison_data)
-                    .mark_bar()
-                    .encode(
-                        x=alt.X("system_type:N", title="System Type"),
-                        y=alt.Y("throughput_msgs_per_sec:Q", title="Messages Per Second (throughput)"),
-                        color="system_type:N",
-                        tooltip=["system_type:N", "throughput_msgs_per_sec:Q", "vec_len:Q"]
+        with col2:
+            st.subheader("Throughput by System Type")
+            
+            if not filtered_data.empty:
+                # Use the same vec_len as middle column
+                if 'selected_vec_len' in locals() and 'comparison_data' in locals():
+                    # Bar chart comparing throughput
+                    all_system_types = sorted(data["system_type"].unique())
+                    max_throughput = data["throughput_msgs_per_sec"].max()
+                    y_domain_throughput = [0, max_throughput * 1.1]
+
+                    chart = (
+                        alt.Chart(comparison_data)
+                        .mark_bar()
+                        .encode(
+                            x=alt.X(
+                                "system_type:N",
+                                title="System Type",
+                                sort=all_system_types,
+                                scale=alt.Scale(domain=all_system_types)
+                            ),
+                            y=alt.Y(
+                                "throughput_msgs_per_sec:Q",
+                                title="Messages Per Second (throughput)",
+                                scale=alt.Scale(domain=y_domain_throughput)
+                            ),
+                            color=alt.Color("system_type:N", legend=None),
+                            tooltip=["system_type:N", "throughput_msgs_per_sec:Q", "vec_len:Q"]
+                        )
+                        .properties(width=700, height=400)
                     )
-                    .properties(width=700, height=400)
-                )
-                st.altair_chart(chart, use_container_width=True)
+                    st.altair_chart(chart, use_container_width=True)
+                else:
+                    st.write("No vector length selected.")
             else:
-                st.write("No vector length selected.")
-        else:
-            st.write("No throughput data available.")
+                st.write("No throughput data available.")
 
 
 # Add a footer with data info
