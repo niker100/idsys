@@ -348,7 +348,7 @@ elif selected_dashboard == "FP Rate in k Identification":
             with col1:
 
                 st.subheader(f"Code Rate for {selected_system_1}")
-                
+
                 # Display metrics for first system type
                 code_rate_subseq = filtered_data_1['code_rate_subsequently'].mean()
                 if code_rate_subseq > 0:
@@ -390,8 +390,6 @@ elif selected_dashboard == "FP Rate in k Identification":
         else:
             st.write("No data available with current filter settings.")
 
-    
-
 # Handle execution time vs. vector length dashboard
 elif selected_dashboard == "Execution Time vs. vec_len":
     # Filter data for execution time
@@ -405,44 +403,84 @@ elif selected_dashboard == "Execution Time vs. vec_len":
 
         # Select system type
         system_types = sorted(filtered_data["system_type"].unique())
-        selected_system = st.selectbox("Select system type:", system_types)
-        
+        selected_system_1 = st.selectbox("Select system type 1:", system_types)
+        selected_system_2 = st.selectbox("Select system type 2:", system_types)
+
         # Filter data by selected system type
-        filtered_data = filtered_data[filtered_data["system_type"] == selected_system]
-        
+        filtered_data_1 = filtered_data[filtered_data["system_type"] == selected_system_1]
+        filtered_data_2 = filtered_data[filtered_data["system_type"] == selected_system_2]
+
         # Select GF exponent
-        gf_exps = sorted(filtered_data["gf_exp"].unique())
+        # Only show GF exponents present in both datasets
+        gf_exps = sorted(set(filtered_data_1["gf_exp"].unique()) & set(filtered_data_2["gf_exp"].unique()))
         if gf_exps:
             selected_gf_exp = st.radio(
                 "Select GF exponent:",
                 gf_exps,
                 format_func=lambda x: f"GF(2^{x})"
             )
-            filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
-        
+            filtered_data_1 = filtered_data_1[filtered_data_1["gf_exp"] == selected_gf_exp]
+            filtered_data_2 = filtered_data_2[filtered_data_2["gf_exp"] == selected_gf_exp]
+
         # Select number of tags
-        num_tags = sorted(filtered_data["num_tags"].unique())
+        # Only show num_tags present in both datasets
+        num_tags = sorted(set(filtered_data_1["num_tags"].unique()) & set(filtered_data_2["num_tags"].unique()))
         if num_tags:
-            selected_num_tags = st.selectbox("Number of tags:", num_tags)
-            filtered_data = filtered_data[filtered_data["num_tags"] == selected_num_tags]
-        
+            selected_num_tags = st.radio(
+                "Number of tags:",
+                num_tags,
+                format_func=lambda x: f"Tags: {x}"
+            )
+            filtered_data_1 = filtered_data_1[filtered_data_1["num_tags"] == selected_num_tags]
+            filtered_data_2 = filtered_data_2[filtered_data_2["num_tags"] == selected_num_tags]
+
         # Display metrics
+        avg_messages = filtered_data['num_messages'].mean()
+        if avg_messages > 0:
+            power_of_ten = int(np.floor(np.log10(avg_messages)))
+        else:
+            power_of_ten = 0
         st.markdown(
-            f"<span style='font-size:14px;'>number of messages: {filtered_data['num_messages'].mean():.0f}</span>",
+            f"<span style='font-size:14px;'>avg messages: 10<sup>{power_of_ten}</sup></span>",
             unsafe_allow_html=True
         )
+
+        if not filtered_data_1.empty and not filtered_data_2.empty:
+            # Combine the two filtered datasets
+            filtered_data = pd.concat([filtered_data_1, filtered_data_2])
+
+            # Pivot data for plotting multiple lines based on vec_len
+            pivot_execution_time = filtered_data.pivot_table(
+                index="vec_len",
+                values="avg_execution_time_ms",
+                columns="system_type",
+                aggfunc="mean"
+            )
+
+            pivot_throughput = filtered_data.pivot_table(
+                index="vec_len",
+                values="throughput_msgs_per_sec",
+                columns="system_type",
+                aggfunc="mean"
+            )
 
     with col2:
         st.subheader("Execution Time vs. Vector Length")
         
-        if not filtered_data.empty:
+        if not pivot_execution_time.empty:
             # Line chart for execution time vs. vec_len
+            chart_data = pivot_execution_time.reset_index().melt(
+                id_vars=["vec_len"],
+                var_name="system_type",
+                value_name="avg_execution_time_ms"
+            )
             chart = (
-                alt.Chart(filtered_data)
+                alt.Chart(chart_data)
                 .mark_line(point=True)
                 .encode(
                     x=alt.X("vec_len:Q", title="Vector Length", scale=alt.Scale(type='log', base=2)),
                     y=alt.Y("avg_execution_time_ms:Q", title="Average Execution Time (ms)", scale=alt.Scale(type='log')),
+                    color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
                     tooltip=["vec_len:Q", "avg_execution_time_ms:Q", "system_type:N", "num_tags:Q"]
                 )
                 .properties(width=700, height=400)
@@ -456,13 +494,19 @@ elif selected_dashboard == "Execution Time vs. vec_len":
         
         if not filtered_data.empty:
             # Line chart for throughput vs. vec_len
+            chart_data = pivot_throughput.reset_index().melt(
+                id_vars=["vec_len"],
+                var_name="system_type",
+                value_name="throughput_msgs_per_sec"
+            )
             chart = (
-                alt.Chart(filtered_data)
+                alt.Chart(chart_data)
                 .mark_line(point=True)
                 .encode(
                     x=alt.X("vec_len:Q", title="Vector Length", scale=alt.Scale(type='log', base=2)),
-                    y=alt.Y("throughput_msgs_per_sec:Q", title="Messages Per Second", scale=alt.Scale(type='log')),
-                    tooltip=["vec_len:Q", "throughput_msgs_per_sec:Q", "system_type:N"]
+                    y=alt.Y("throughput_msgs_per_sec:Q", title="Messages Per Second (throughput)", scale=alt.Scale(type='log')),
+                    color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
+                    tooltip=["vec_len:Q", "throughput_msgs_per_sec:Q", "system_type:N", "num_tags:Q"]
                 )
                 .properties(width=700, height=400)
             )
