@@ -498,7 +498,7 @@ def generate_structured_messages(
         elif pattern_type == "low_entropy":
             # Use process-specific random state
             alphabet = [0, 1, 2, 3]
-            return list(process_random.choice(alphabet, size=vec_len))
+            return process_random.choice(alphabet, size=vec_len).tolist()
         
         elif pattern_type == "only_two":
             # Generate messages with only two distinct values
