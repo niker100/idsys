@@ -84,6 +84,8 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
         msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
         # Calculate KL divergence for message PDF
         msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
+        # Calculate collision probability for message PDF
+        msg_collision_prob = float(np.sum(np.square(msg_probs)))
         # Save the false positive rate for each system in a dict
         fp_rates = {}
         for idx, system_name in enumerate(systems):
@@ -103,23 +105,26 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
                 examples.append(next(example_gen))
         except StopIteration:
             pass
-        # Save message PDF, examples, KL divergence, and fp rates
+        # Save message PDF, examples, KL divergence, collision prob, and fp rates
         row = {
             "pattern": pattern,
             "msg_pdf": msg_probs,
             "examples": examples,
-            "msg_kl_div": msg_kl_div
+            "msg_kl_div": msg_kl_div,
+            "msg_collision_prob": msg_collision_prob
         }
         # Add fp rates for each system
         for system_name in systems:
             row[f"fp_rate_{system_name}"] = fp_rates[system_name]
-        # Save tag PDFs and KL divergence for each system
+        # Save tag PDFs, KL divergence, and collision probability for each system
         for idx, system_name in enumerate(systems):
             tag_pdf = all_results[pattern][idx]['tag_pdf']
             tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
             tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
+            tag_collision_prob = float(np.sum(np.square(tag_probs)))
             row[f"tag_pdf_{system_name}"] = tag_probs
             row[f"tag_kl_div_{system_name}"] = tag_kl_div
+            row[f"tag_collision_prob_{system_name}"] = tag_collision_prob
         rows.append(row)
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(outdir, "pdfs_and_examples.csv"), index=False)
