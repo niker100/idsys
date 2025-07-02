@@ -38,7 +38,7 @@ ANALYSIS_CONFIG = {
     "system_types": ["RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"],
     "gf_exponents": [8, 16, 32, 64],
     "vector_lengths": [2**i for i in range(3, 17)],  # 8 to 65536
-    "validation_messages": [1, 10, 100],
+    "validation_messages": [2**i for i in range(1, 14)],  # 2^1 to 2^10
     "message_patterns": ["random", "sparse", "low_entropy"],
     "tag_counts": {
         "RSID": [1, 2, 3],
@@ -47,7 +47,7 @@ ANALYSIS_CONFIG = {
         "SHA1ID": [1],
         "SHA256ID": [1]
     },
-    "num_messages": 1000000,  # Default number of messages for false positive testing
+    "num_messages": 10000000,  # Default number of messages for false positive testing
     "calculate_pdfs": False,  # Disable PDF calculation for memory efficiency
     "rm_orders": {
         "RMID": [1]  # Different Reed-Muller orders
@@ -56,11 +56,11 @@ ANALYSIS_CONFIG = {
 
 # Cached vector lengths for different system types
 CACHED_VECTOR_LENGTHS = {
-    "RSID": [2**i for i in range(2, 14)],    # Up to 8192
-    "RS2ID": [2**i for i in range(2, 10)],   # Up to 512
-    "RMID": [2**i for i in range(2, 14)],    # Up to 8192
-    "SHA1ID": [2**i for i in range(2, 17)],  # Up to 65536
-    "SHA256ID": [2**i for i in range(2, 17)] # Up to 65536
+    "RSID": [2**i for i in range(3, 17)],    # Up to 65536
+    "RS2ID": [2**i for i in range(3, 17)],   # Up to 65536
+    "RMID": [2**i for i in range(3, 17)],    # Up to 65536
+    "SHA1ID": [2**i for i in range(3, 17)],  # Up to 65536
+    "SHA256ID": [2**i for i in range(3, 17)] # Up to 65536
 }
 
 def create_parameter_sets():
@@ -112,7 +112,7 @@ def create_parameter_sets():
                             "tag_pos": tag_positions,
                             "num_tags": tag_count,
                             "num_validation_messages": 1,
-                            "num_messages": min(100000, max(10000, 10000 // (vec_len // 100 + 1))),
+                            "num_messages": min(1000000, max(100000, 1000000 // (vec_len // 100 + 1))),
                             "message_pattern": "random",
                             "rm_order": rm_order
                         })
