@@ -149,16 +149,15 @@ if selected_dashboard == "PDF & Example Explorer":
                 })
                 
                 # Filter out zeros for better visualization
-                msg_pdf_df = msg_pdf_df[msg_pdf_df['Probability'] > 0]
+                msg_pdf_df_filtered = msg_pdf_df[msg_pdf_df['Probability'] > 0]
                 
                 # Create line chart with Altair
-                msg_chart = alt.Chart(msg_pdf_df).mark_line(
-                    point=True,
-                    strokeWidth=2
+                msg_chart = alt.Chart(msg_pdf_df_filtered).mark_circle(
+                    size=20
                 ).encode(
                     x=alt.X('Symbol:Q', title='Symbol Value', scale=alt.Scale(domain=[0, 255])),
                     y=alt.Y('Probability:Q', title='Probability'),
-                    color=alt.value('#2C3E50'),
+                    color=alt.value('#CAE4FF'),
                     tooltip=['Symbol:Q', 'Probability:Q']
                 ).properties(
                     width=300,
@@ -171,7 +170,7 @@ if selected_dashboard == "PDF & Example Explorer":
                 ).encode(
                     x=alt.X('Symbol:Q'),
                     y=alt.Y('Probability:Q'),
-                    color=alt.value('#2C3E50')
+                    color=alt.value("#CAE4FF")
                 )
                 
                 st.altair_chart((msg_area + msg_chart), use_container_width=True)
@@ -187,16 +186,15 @@ if selected_dashboard == "PDF & Example Explorer":
                 })
                 
                 # Filter out zeros for better visualization
-                tag_pdf_df = tag_pdf_df[tag_pdf_df['Probability'] > 0]
+                tag_pdf_df_filtered = tag_pdf_df[tag_pdf_df['Probability'] > 0]
                 
                 # Create line chart with Altair
-                tag_chart = alt.Chart(tag_pdf_df).mark_line(
-                    point=True,
-                    strokeWidth=2
+                tag_chart = alt.Chart(tag_pdf_df_filtered).mark_circle(
+                    size=20
                 ).encode(
                     x=alt.X('Symbol:Q', title='Symbol Value', scale=alt.Scale(domain=[0, 255])),
                     y=alt.Y('Probability:Q', title='Probability'),
-                    color=alt.value('#E74C3C'),
+                    color=alt.value("#FF321B"),
                     tooltip=['Symbol:Q', 'Probability:Q']
                 ).properties(
                     width=300,
@@ -209,7 +207,7 @@ if selected_dashboard == "PDF & Example Explorer":
                 ).encode(
                     x=alt.X('Symbol:Q'),
                     y=alt.Y('Probability:Q'),
-                    color=alt.value('#E74C3C')
+                    color=alt.value('#FF321B')
                 )
                 
                 st.altair_chart((tag_area + tag_chart), use_container_width=True)
