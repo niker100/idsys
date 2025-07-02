@@ -258,6 +258,8 @@ class IdMetrics:
         # Calculate code rate
         code_rate_bulk, coderate_subsequently = IdMetrics._calculate_code_rate(num_tags, vec_len*8 , gf_exp)
 
+        theoretical_fp_rate = IdMetrics._calculate_theoretical_fp_rate(num_validation_messages, num_tags, gf_exp)
+
         # Run parallel message processing with integrated metrics calculation
         fp_rate, false_positives, timing_metrics, collision_metrics, total_messages, aggregated_metrics = IdMetrics._propagate_messages_parallel(
             system, vec_len, num_messages, num_validation_messages, num_processes, message_pattern, calculate_pdfs
@@ -271,6 +273,7 @@ class IdMetrics:
             'false_positives': false_positives,
             'code_rate_bulk': code_rate_bulk,
             'code_rate_subsequently': coderate_subsequently,
+            'theoretical_fp_rate': theoretical_fp_rate,
             
             # Timing metrics
             'avg_execution_time_ms': timing_metrics['avg_execution_time_ms'],
@@ -317,6 +320,24 @@ class IdMetrics:
         coderate_subsequently = coderate_single / avg_num_tags #code rate for subsequent transmission of multipe tags
 
         return coderate_bulk, coderate_subsequently
+    
+    @staticmethod
+    def _calculate_theoretical_fp_rate(k: int, t: int, gf_exp: int) -> float:
+        """
+        Calculate theoretical false positive rate for k-identification with t tags.
+        
+        Args:
+            k: Number of validation messages
+            t: Number of tags
+            gf_exp: Exponent for Galois Field size (2^gf_exp)
+            
+        Returns:
+            Theoretical false positive rate
+        """
+        p = 1.0 / (2 ** gf_exp) # Base false positive rate for single tag and message
+        # For k-identification with t tags:
+        # P_fp = 1 - (1 - p^t)^k
+        return 1 - (1 - p**t)**k
     
     @staticmethod
     def _get_system_info(system: IdSystem) -> Tuple[str, Dict]:
