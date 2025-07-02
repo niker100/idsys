@@ -9,11 +9,13 @@ import numpy as np
 from collections import defaultdict
 import matplotlib.pyplot as plt
 from typing import List, Dict, Set, Tuple
+import pandas as pd
 
 # Add framework path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from framework import create_id_system, IdMetrics
+from framework.core import generate_structured_messages
 
 def run_analysis(patterns):
     """Run the analysis."""
@@ -26,10 +28,12 @@ def run_analysis(patterns):
     target_messages = 10**7
     
     systems = {
-        "raw": create_id_system("NoCode", {"gf_exp": gf_exp}),
-        "reed_solomon": create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]}),                
-        "rmid": create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2], "rm_order": 1}),
-        "sha1": create_id_system("SHA1ID", {"gf_exp": gf_exp})
+        "RAW": create_id_system("NoCode", {"gf_exp": gf_exp}),
+        "RSID": create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]}),
+        "RS2ID": create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": [2], "tag_pos_in": [2]}),     
+        "RMID": create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2], "rm_order": 1}),
+        "SHA1ID": create_id_system("SHA1ID", {"gf_exp": gf_exp}),
+        "SHA256ID": create_id_system("SHA256ID", {"gf_exp": gf_exp})
     }
     
     all_results = {}
@@ -56,20 +60,64 @@ def run_analysis(patterns):
 
     return all_results
 
+def calculate_kl_divergence_from_uniform(pdf_dict, alphabet_size=256):
+    entropy = 0.0
+    for prob in pdf_dict.values():
+        if prob > 0:
+            entropy -= prob * np.log2(prob)
+    kl_div = np.log2(alphabet_size) - entropy
+    return kl_div
+
 def plot_pdfs(all_results, patterns, systems):
     """Plot the PDFs with empirical false positive rates and example messages."""
     outdir = "analyses/collision"
     os.makedirs(outdir, exist_ok=True)
 
-    from framework.core import generate_structured_messages
+    
+def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/collision"):
+    os.makedirs(outdir, exist_ok=True)
+    rows = []
+    for pattern in patterns:
+        # Get message PDF and examples
+        msg_pdf = all_results[pattern][0]['message_pdf']
+        all_symbols = list(range(256))
+        msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
+        # Calculate KL divergence for message PDF
+        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
+        vec_len = 16
+        gf_exp = 8
+        example_gen = generate_structured_messages(
+            vec_len=vec_len,
+            pattern_type=pattern,
+            gf_exp=gf_exp,
+            target_count=3,
+            generate_first=False
+        )
+        examples = []
+        try:
+            for _ in range(3):
+                examples.append(next(example_gen))
+        except StopIteration:
+            pass
+        # Save message PDF, examples, and KL divergence
+        row = {
+            "pattern": pattern,
+            "msg_pdf": msg_probs,
+            "examples": examples,
+            "msg_kl_div": msg_kl_div
+        }
+        # Save tag PDFs and KL divergence for each system
+        for idx, system_name in enumerate(systems):
+            tag_pdf = all_results[pattern][idx]['tag_pdf']
+            tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
+            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
+            row[f"tag_pdf_{system_name}"] = tag_probs
+            row[f"tag_kl_div_{system_name}"] = tag_kl_div
+        rows.append(row)
+    df = pd.DataFrame(rows)
+    df.to_csv(os.path.join(outdir, "pdfs_and_examples.csv"), index=False)
+    print(f"Saved CSV to {os.path.join(outdir, 'pdfs_and_examples.csv')}")
 
-    def calculate_kl_divergence_from_uniform(pdf_dict, alphabet_size=256):
-        entropy = 0.0
-        for prob in pdf_dict.values():
-            if prob > 0:
-                entropy -= prob * np.log2(prob)
-        kl_div = np.log2(alphabet_size) - entropy
-        return kl_div
 
     # Publication-ready style
     plt.style.use('seaborn-v0_8-whitegrid')
@@ -106,12 +154,12 @@ def plot_pdfs(all_results, patterns, systems):
             vec_len=vec_len,
             pattern_type=pattern,
             gf_exp=gf_exp,
-            target_count=2,
+            target_count=3,
             generate_first=False
         )
         examples = []
         try:
-            for _ in range(2):
+            for _ in range(3):
                 examples.append(next(example_gen))
         except StopIteration:
             pass
@@ -173,79 +221,15 @@ def plot_pdfs(all_results, patterns, systems):
         plt.savefig(f"{outdir}/pdf_{pattern}.svg", format='svg')
         plt.close()
 
-def print_fpr_comparison(all_results, patterns, systems):
-    """Print a summary table comparing theoretical vs empirical FPRs."""
-    print("\n" + "=" * 70)
-    print("FALSE POSITIVE RATE COMPARISON: THEORETICAL vs EMPIRICAL")
-    print("=" * 70)
-    
-    def calculate_theoretical_fpr(pdf_dict):
-        return sum(p**2 for p in pdf_dict.values())
-    
-    for pattern in patterns:
-        print(f"\n{pattern.upper()}:")
-        print(f"{'System':<15} {'Theoretical FPR':<20} {'Empirical FPR':<20} {'Ratio':<10}")
-        print("-" * 65)
-        
-        pattern_results = all_results[pattern]
-        for idx, system_name in enumerate(systems):
-            result = pattern_results[idx]
-            tag_pdf = result['tag_pdf']
-            theoretical_fpr = calculate_theoretical_fpr(tag_pdf)
-            empirical_fpr = result['false_positive_rate']
-            ratio = empirical_fpr / theoretical_fpr if theoretical_fpr > 0 else float('inf')
-            
-            print(f"{system_name:<15} {theoretical_fpr:<20.6f} {empirical_fpr:<20.6f} {ratio:<10.2f}")
 
 if __name__ == "__main__":
     
     patterns = ["random", "incremental", "repeated_patterns", "sparse", "low_entropy", "only_two"]
     all_results = run_analysis(patterns)
     # After analysis, plot PDFs
-    systems = ["raw", "rs", "rm", "sha1"]
+    systems = ["RAW", "RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"]
     # all_results is created in run_analysis()
     plot_pdfs(all_results, patterns, systems)
     print("PDF plots saved in analyses/collision/")
 
-    print_fpr_comparison(all_results, patterns, systems)
-
-
-# OUTPUT:
-# ======================================================================
-# IDENTIFICATION SYSTEM COLLISION ANALYSIS
-# ======================================================================
-
-# RANDOM MESSAGES:
-# ----------------------------------------
-# Generated 10000 messages (10000 unique)
-# raw         :  745 false positives, 9255 unique tags
-# reed_solomon:  702 false positives, 9298 unique tags
-# sha1        :  769 false positives, 9231 unique tags
-
-# INCREMENTAL MESSAGES:
-# ----------------------------------------
-# Generated 10000 messages (10000 unique)
-# raw         : 9999 false positives,    1 unique tags
-# reed_solomon:    0 false positives, 10000 unique tags
-# sha1        :  779 false positives, 9221 unique tags
-
-# REPEATED_PATTERNS MESSAGES:
-# ----------------------------------------
-# Generated 113 messages (113 unique)
-# raw         :  105 false positives,    8 unique tags
-# reed_solomon:    0 false positives,  113 unique tags
-# sha1        :    0 false positives,  113 unique tags
-
-# SPARSE MESSAGES:
-# ----------------------------------------
-# Generated 10000 messages (10000 unique)
-# raw         : 8749 false positives, 1251 unique tags
-# reed_solomon:  695 false positives, 9305 unique tags
-# sha1        :  712 false positives, 9288 unique tags
-
-# LOW_ENTROPY MESSAGES:
-# ----------------------------------------
-# Generated 10000 messages (10000 unique)
-# raw         : 9996 false positives,    4 unique tags
-# reed_solomon:  710 false positives, 9290 unique tags
-# sha1        :  745 false positives, 9255 unique tags
+    save_pdfs_and_examples(all_results, patterns, systems)
