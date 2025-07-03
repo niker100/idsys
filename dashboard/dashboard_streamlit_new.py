@@ -308,6 +308,14 @@ elif selected_dashboard == "FP Rate in k Identification":
                 var_name='vec_len',
                 value_name='false_positive_rate'
             )
+
+            # Add theoretical_fp_rate to the chart data if available
+            # Assume theoretical_fp_rate is in filtered_data with columns: num_validation_messages, vec_len, theoretical_fp_rate
+            if "theoretical_fp_rate" in filtered_data.columns:
+                theory_data = filtered_data[["num_validation_messages", "vec_len", "theoretical_fp_rate"]].drop_duplicates()
+                theory_data = theory_data.rename(columns={"theoretical_fp_rate": "false_positive_rate"})
+                theory_data["vec_len"] = "Theoretical Bound"
+                chart_data = pd.concat([theory_data,chart_data], ignore_index=True)
             
             chart = (
                 alt.Chart(chart_data)
@@ -614,8 +622,6 @@ elif selected_dashboard == "System Type Comparison":
                 # Bar chart comparing system types
                 # Always show all system types on the x-axis, even if some are missing in the filtered data
                 all_system_types = sorted(data["system_type"].unique())
-                max_exec_time = data["avg_execution_time_ms"].max()
-                y_domain_execution_time = [0, max_exec_time * 1.1]
 
                 chart = (
                     alt.Chart(comparison_data)
@@ -630,7 +636,6 @@ elif selected_dashboard == "System Type Comparison":
                         y=alt.Y(
                             "avg_execution_time_ms:Q",
                             title="Avg Execution Time (ms)",
-                            scale=alt.Scale(domain=y_domain_execution_time)
                         ),
                         color=alt.Color("system_type:N", legend=None),
                         tooltip=["system_type:N", "avg_execution_time_ms:Q", "vec_len:Q"]
@@ -649,8 +654,6 @@ elif selected_dashboard == "System Type Comparison":
                 if 'selected_vec_len' in locals() and 'comparison_data' in locals():
                     # Bar chart comparing throughput
                     all_system_types = sorted(data["system_type"].unique())
-                    max_throughput = data["throughput_msgs_per_sec"].max()
-                    y_domain_throughput = [0, max_throughput * 1.1]
 
                     chart = (
                         alt.Chart(comparison_data)
@@ -665,7 +668,6 @@ elif selected_dashboard == "System Type Comparison":
                             y=alt.Y(
                                 "throughput_msgs_per_sec:Q",
                                 title="Messages Per Second (throughput)",
-                                scale=alt.Scale(domain=y_domain_throughput)
                             ),
                             color=alt.Color("system_type:N", legend=None),
                             tooltip=["system_type:N", "throughput_msgs_per_sec:Q", "vec_len:Q"]
