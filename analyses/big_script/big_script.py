@@ -119,7 +119,13 @@ def create_parameter_sets():
     
     # 2. FALSE POSITIVE RATE TESTS
     for system_type in ANALYSIS_CONFIG["system_types"]:
-        for gf_exp in [8, 16]:  # Limit to smaller GF sizes for FP rate tests
+        for gf_exp in [8, 16, 32, 64]:  # Limit to smaller GF sizes for FP rate tests
+
+            if system_type == "RS2ID" and gf_exp > 32:
+                continue
+            if system_type == "RMID" and gf_exp > 32:
+                continue
+        
             # For each tag count compatible with system
             for tag_count in ANALYSIS_CONFIG["tag_counts"].get(system_type, [1]):
                 # Generate tag positions
