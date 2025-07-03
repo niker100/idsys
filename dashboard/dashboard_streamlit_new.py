@@ -244,8 +244,8 @@ elif selected_dashboard == "FP Rate in k Identification":
             #st.warning("Please select two different system types for comparison.")
         
         # Filter data by selected system type
-        filtered_data_1 = data[data["system_type"] == selected_system_1]
-        filtered_data_2 = data[data["system_type"] == selected_system_2]
+        filtered_data_1 = filtered_data[filtered_data["system_type"] == selected_system_1]
+        filtered_data_2 = filtered_data[filtered_data["system_type"] == selected_system_2]
         
         # Select GF exponent
         # Only show GF exponents present in both datasets
