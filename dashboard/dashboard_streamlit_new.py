@@ -83,23 +83,25 @@ if selected_dashboard == "PDF & Example Explorer":
             else:
                 st.write("No examples available")
                 
-            # Display KL divergence, FP rate, and collision probability values
+            # Display KL divergence, FP rate, collision probability, and G_KL values from CSV
             st.markdown("**Formulas:**")
             st.latex(r"D_{KL}(p\,\|\,u) = \sum_i p_i \log_2 \frac{p_i}{1/N}")
             st.latex(r"P_{\text{collision}} = \sum_i p_i^2")
+            st.latex(r"G_{KL} = \frac{D_{KL}(p_{message}\,\|\,u)-D_{KL}(p_{tag}\,\|\,u)}{D_{KL}(p_{message}\,\|\,u)}")
 
             if f"msg_kl_div" in pattern_data:
-                msg_kl = pattern_data["msg_kl_div"]
-                st.write(f"Message PDF KL Divergence: {msg_kl:.3f}")
+                st.write(f"Message PDF KL Divergence: {pattern_data['msg_kl_div']:.3f}")
+            if f"msg_collision_prob" in pattern_data:
+                st.write(f"Message PDF Collision Probability: {pattern_data['msg_collision_prob']:.2e}")
             if f"tag_kl_div_{system}" in pattern_data:
-                tag_kl = pattern_data[f"tag_kl_div_{system}"]
-                st.write(f"Tag PDF KL Divergence: {tag_kl:.3f}")
+                st.write(f"Tag PDF KL Divergence: {pattern_data[f'tag_kl_div_{system}']:.3f}")
             if f"tag_collision_prob_{system}" in pattern_data:
-                tag_coll = pattern_data[f"tag_collision_prob_{system}"]
-                st.write(f"Theoretical Tag Collision Probability: {tag_coll:.2e}")
+                st.write(f"Tag PDF Collision Probability: {pattern_data[f'tag_collision_prob_{system}']:.2e}")
+            if f"g_kl_{system}" in pattern_data:
+                st.write(f"Relative KL Divergence Gain G_KL: {pattern_data[f'g_kl_{system}']:.2f}")
             if f"fp_rate_{system}" in pattern_data:
-                tag_fp = pattern_data[f"fp_rate_{system}"]
-                st.write(f"Actual FP Rate (= Tag Collision Prob.): {tag_fp:.2e}")
+                st.write(f"FP Rate: {pattern_data[f'fp_rate_{system}']:.2e}")
+                     
         
         # Display area
         with col2:

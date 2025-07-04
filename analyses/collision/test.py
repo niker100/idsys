@@ -105,7 +105,8 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
                 examples.append(next(example_gen))
         except StopIteration:
             pass
-        # Save message PDF, examples, KL divergence, collision prob, and fp rates
+        # Calculate theoretical collision probability (sum p^2) for message and tags
+        # Calculate G_KL (relative KL divergence gain) for each system
         row = {
             "pattern": pattern,
             "msg_pdf": msg_probs,
@@ -116,15 +117,21 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
         # Add fp rates for each system
         for system_name in systems:
             row[f"fp_rate_{system_name}"] = fp_rates[system_name]
-        # Save tag PDFs, KL divergence, and collision probability for each system
+        # Save tag PDFs, KL divergence, collision probability, G_KL for each system
         for idx, system_name in enumerate(systems):
             tag_pdf = all_results[pattern][idx]['tag_pdf']
             tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
             tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
             tag_collision_prob = float(np.sum(np.square(tag_probs)))
+            # G_KL: relative KL divergence gain
+            if msg_kl_div > 1e-5:
+                g_kl = (msg_kl_div - tag_kl_div) / msg_kl_div
+            else:
+                g_kl = 0.0
             row[f"tag_pdf_{system_name}"] = tag_probs
             row[f"tag_kl_div_{system_name}"] = tag_kl_div
             row[f"tag_collision_prob_{system_name}"] = tag_collision_prob
+            row[f"g_kl_{system_name}"] = g_kl
         rows.append(row)
     df = pd.DataFrame(rows)
     df.to_csv(os.path.join(outdir, "pdfs_and_examples.csv"), index=False)
@@ -154,6 +161,8 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
         msg_pdf = all_results[pattern][0]['message_pdf']
         all_symbols = list(range(256))
         msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
+        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
+        msg_collision_prob = float(np.sum(np.square(msg_probs)))
 
         fig = plt.figure(figsize=(30, 10))
         gs = fig.add_gridspec(2, len(systems) + 1, height_ratios=[0.8, 2.2], hspace=0.4, wspace=0.25)
@@ -198,11 +207,9 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
         color = '#2C3E50'
         ax_msg.plot(all_symbols, msg_probs, marker='.', linestyle='-', linewidth=1.1, color=color, label='Message PDF')
         ax_msg.fill_between(all_symbols, msg_probs, alpha=0.15, color=color)
-        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
-        ax_msg.set_title(f"Message PDF\nKL div: {msg_kl_div:.3f}", fontweight='bold', pad=8)
+        ax_msg.set_title(f"Message PDF\nKL div: {msg_kl_div:.3f}\nCollision Prob: {msg_collision_prob:.2e}", fontweight='bold', pad=8)
         ax_msg.set_xlabel("Symbol Value")
         ax_msg.set_ylabel("Probability")
-        #ax_msg.set_xlim(0, 255)
         ax_msg.set_ylim(0, max(msg_probs) * 1.15 if nonzero > 1 else 1.05)
         ax_msg.grid(True, alpha=0.3)
         ax_msg.legend(loc='upper right', frameon=False)
@@ -212,18 +219,22 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
             tag_pdf = result['tag_pdf']
             tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
             nonzero_tag = np.count_nonzero(tag_probs)
+            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
+            tag_collision_prob = float(np.sum(np.square(tag_probs)))
+            if msg_kl_div > 1e-5:
+                g_kl = (msg_kl_div - tag_kl_div) / msg_kl_div
+            else:
+                g_kl = 0.0
+            empirical_fpr = result['false_positive_rate']
             ax_tag = fig.add_subplot(gs[1, idx + 1])
             ax_tag.plot(all_symbols, tag_probs, marker='.', linestyle='-', linewidth=1.1, color='#E74C3C', label='Tag PDF')
             ax_tag.fill_between(all_symbols, tag_probs, alpha=0.15, color='#E74C3C')
-            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
-            empirical_fpr = result['false_positive_rate']
-            ax_tag.set_title(f"{system_name}\nKL div: {tag_kl_div:.3f}\nEmpirical FPR: {empirical_fpr:.6f}", fontweight='bold', pad=8)
+            ax_tag.set_title(f"{system_name}\nKL div: {tag_kl_div:.3f}\nCollision Prob: {tag_collision_prob:.2e}\nG_KL: {g_kl:.2f}\nEmpirical FPR: {empirical_fpr:.6f}", fontweight='bold', pad=8)
             ax_tag.set_xlabel("Symbol Value")
             if idx == 0:
                 ax_tag.set_ylabel("Probability")
             else:
                 ax_tag.set_ylabel("")
-            #ax_tag.set_xlim(0, 255)
             ax_tag.set_ylim(0, max(tag_probs) * 1.15 if nonzero_tag > 1 else 1.05)
             ax_tag.grid(True, alpha=0.3)
             ax_tag.legend(loc='upper right', frameon=False)
