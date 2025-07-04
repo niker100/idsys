@@ -29,6 +29,15 @@ selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
 st.title("Identification Systems Dashboard")
 st.subheader(selected_dashboard)
 
+pattern_explanations = {
+    "random": "Messages are generated with uniformly random byte values (0-255).",
+    "incremental": "Each message is a sequence of zeros followed by a incrementing last byte (mod 2^(gf_exp)) (e.g., `[0, 0, ..., 1]`, `[0, 0, ..., 2]`).",
+    "repeated_patterns": "Messages consist of a short, repeating byte pattern (e.g., `[255, 0, 255, 0, ...]`, `[170, 187, 170, 187, ...]`).",
+    "only_two": "Messages are constructed so only two unique messages exist, one of them is used at the sender and one at the receiver. This is used to test the consistency of tag generation",
+    "low_entropy": "There is a limited alphabet `[0,1,2,3]` from which random symbols are picked to generate the messages.",
+    "sparse": "Messages are mostly zeros, with few non-zero byte (255) at a different positions in each message."
+}
+
 # Handle PDF & Example Explorer separately (different layout)
 if selected_dashboard == "PDF & Example Explorer":
     # Load the PDF and examples CSV
@@ -67,7 +76,7 @@ if selected_dashboard == "PDF & Example Explorer":
             st.subheader("Controls")
             
             # Select message pattern
-            pattern = st.radio("Select Message Pattern:", pdf_df["pattern"].tolist())
+            pattern = st.radio("Select Message Pattern:", pdf_df["pattern"].unique(), )
             
             # Select system for tag PDF
             system = st.radio("Select System for Tag PDF:", system_names)
@@ -78,29 +87,12 @@ if selected_dashboard == "PDF & Example Explorer":
             
             # Display how many examples are available
             num_examples = len(pattern_data["examples"])
-            if num_examples > 0:
-                st.write(f"{num_examples} example(s) available")
-            else:
-                st.write("No examples available")
-                
-            # Display KL divergence, FP rate, collision probability, and G_KL values from CSV
-            st.markdown("**Formulas:**")
-            st.latex(r"D_{KL}(p\,\|\,u) = \sum_i p_i \log_2 \frac{p_i}{1/N}")
-            st.latex(r"P_{\text{collision}} = \sum_i p_i^2")
-            st.latex(r"G_{KL} = \frac{D_{KL}(p_{message}\,\|\,u)-D_{KL}(p_{tag}\,\|\,u)}{D_{KL}(p_{message}\,\|\,u)}")
+            st.write(f"{num_examples} example(s) available for this pattern.")
 
-            if f"msg_kl_div" in pattern_data:
-                st.write(f"Message PDF KL Divergence: {pattern_data['msg_kl_div']:.3f}")
-            if f"msg_collision_prob" in pattern_data:
-                st.write(f"Message PDF Collision Probability: {pattern_data['msg_collision_prob']:.2e}")
-            if f"tag_kl_div_{system}" in pattern_data:
-                st.write(f"Tag PDF KL Divergence: {pattern_data[f'tag_kl_div_{system}']:.3f}")
-            if f"tag_collision_prob_{system}" in pattern_data:
-                st.write(f"Tag PDF Collision Probability: {pattern_data[f'tag_collision_prob_{system}']:.2e}")
-            if f"g_kl_{system}" in pattern_data:
-                st.write(f"Relative KL Divergence Gain G_KL: {pattern_data[f'g_kl_{system}']:.2f}")
-            if f"fp_rate_{system}" in pattern_data:
-                st.write(f"FP Rate: {pattern_data[f'fp_rate_{system}']:.2e}")
+            st.markdown("**Formulas:**")
+            st.latex(r"D_{KL}(p\,\|\,u) = \sum_i p_i \log_2 \frac{p_i}{1/N} = \log_2 |{\mathcal{X}| - H(p)}", help="KL Divergence of distribution p from uniform distribution u")
+            st.latex(r"P_{\text{collision}} = \sum_i p_i^2", help="Collision probability is the probability of picking the same tag twice")
+            st.latex(r"G_{KL} = \frac{D_{KL}(p_{message}\,\|\,u)-D_{KL}(p_{tag}\,\|\,u)}{D_{KL}(p_{message}\,\|\,u)}", help="Relative KL Divergence Gain measures the reduction in non-uniformity from message to tag. Higher is better. A value of 100% means the tags are perfectly uniform (random-like).")
                      
         
         # Display area
@@ -110,9 +102,25 @@ if selected_dashboard == "PDF & Example Explorer":
             msg_pdf = row["msg_pdf"]
             examples = row["examples"]
             tag_pdf = row[f"tag_pdf_{system}"]
+
+            # Extract metrics for display
+            msg_kl_div = row.get('msg_kl_div', 0)
+            msg_collision_prob = row.get('msg_collision_prob', 0)
+            tag_kl_div = row.get(f'tag_kl_div_{system}', 0)
+            tag_collision_prob = row.get(f'tag_collision_prob_{system}', 0)
+            g_kl = row.get(f'g_kl_{system}', 0)
+            fp_rate = row.get(f'fp_rate_{system}', 0)
+
+            # 1. Make G_KL the most prominent metric
+            st.metric(
+                label=f"Relative KL Divergence Gain (G_KL) for {system}",
+                value=f"{g_kl:.2%}",
+                help="Measures the reduction in non-uniformity from message to tag. Higher is better. A value of 100% means the tags are perfectly uniform (random-like)."
+            )
+            st.markdown("---")
             
-            # 1. Display examples on top
-            st.subheader(f"Example Messages for '{pattern}' Pattern")
+            # 2. Display examples on top
+            st.subheader(f"Example Messages for '{pattern}' Pattern", help=pattern_explanations.get(pattern, "No description available."))
             
             if examples and len(examples) > 0:
                 # Convert to numpy array for visualization
@@ -146,7 +154,8 @@ if selected_dashboard == "PDF & Example Explorer":
             else:
                 st.info("No example messages available for this pattern.")
             
-            # 2. Message and Tag PDFs side by side
+            # 3. Message and Tag PDFs side by side
+            st.markdown("---")
             col_pdf1, col_pdf2 = st.columns(2)
             
             with col_pdf1:
@@ -223,6 +232,41 @@ if selected_dashboard == "PDF & Example Explorer":
                 
                 st.altair_chart((tag_area + tag_chart), use_container_width=True)
 
+            # 4. Detailed metrics at the bottom
+            st.markdown("---")
+            st.subheader("Detailed Metrics")
+            mcol1, mcol2, mcol3 = st.columns(3)
+
+            with mcol1:
+                st.metric(
+                    label="Message KL Divergence",
+                    value=f"{msg_kl_div:.3f}",
+                    help="Measures how much the message distribution differs from a uniform one. Higher means less uniform."
+                )
+                st.metric(
+                    label="Message Collision Prob.",
+                    value=f"{msg_collision_prob:.2e}",
+                    help="Probability that two randomly chosen messages are identical. Higher means less diverse."
+                )
+            with mcol2:
+                st.metric(
+                    label="Tag KL Divergence",
+                    value=f"{tag_kl_div:.3f}",
+                    help="Measures how much the tag distribution differs from a uniform one. Lower is better."
+                )
+                st.metric(
+                    label="Tag Collision Prob.",
+                    value=f"{tag_collision_prob:.2e}",
+                    help="Probability that two different messages produce the same tag. Lower is better."
+                )
+            with mcol3:
+                st.metric(
+                    label="False Positive Rate",
+                    value=f"{fp_rate:.2e}",
+                    help="The theoretical probability of a random, non-matching message-tag pair being accepted as valid."
+                )
+
+
 # Handle FP Rate in k Identification dashboard
 elif selected_dashboard == "FP Rate in k Identification":
 
@@ -280,12 +324,7 @@ elif selected_dashboard == "FP Rate in k Identification":
             filtered_data_1 = filtered_data_1[filtered_data_1["message_pattern"] == selected_pattern]
             filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
 
-        if selected_pattern == "random":
-            st.markdown("random explanation")
-        elif selected_pattern == "low_entropy":
-            st.markdown("low_entropy explanation")
-        elif selected_pattern == "sparse":
-            st.markdown("sparse explanation")
+        st.markdown(" ", help=pattern_explanations.get(selected_pattern, "No description available."))
         
 
         # Pivot data for plotting multiple lines based on test_type
