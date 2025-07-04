@@ -241,7 +241,7 @@ if selected_dashboard == "PDF & Example Explorer":
                 st.metric(
                     label="Message KL Divergence",
                     value=f"{msg_kl_div:.3f}",
-                    help="Measures how much the message distribution differs from a uniform one. Higher means less uniform."
+                    help="Measures how much the message distribution differs from a uniform one. Higher means less uniform. Ideally, this should be equal to the empirical false positive rate (FP Rate) of the system."
                 )
                 st.metric(
                     label="Message Collision Prob.",
@@ -263,7 +263,7 @@ if selected_dashboard == "PDF & Example Explorer":
                 st.metric(
                     label="False Positive Rate",
                     value=f"{fp_rate:.2e}",
-                    help="The theoretical probability of a random, non-matching message-tag pair being accepted as valid."
+                    help="The empirical probability of a random, non-matching message-tag pair being accepted as valid."
                 )
 
 
@@ -410,17 +410,17 @@ elif selected_dashboard == "FP Rate in k Identification":
                 if code_rate_subseq > 0:
                     power_of_ten = int(np.floor(np.log10(code_rate_subseq)))
                     mantissa = code_rate_subseq / (10 ** power_of_ten)
-                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
+                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}", help="The effective code rate for the scenario of sending more tags only if a positive identification is registered.")
                 else:
-                    st.metric("Code Rate Subsequently", f"{code_rate_subseq:.3f}")
+                    st.metric("Code Rate Subsequently", f"{code_rate_subseq:.3f}", help="The effective code rate for the scenario of sending more tags only if a positive identification is registered.")
                 
                 code_rate_bulk = filtered_data_1['code_rate_bulk'].mean()
                 if code_rate_bulk > 0:
                     power_of_ten = int(np.floor(np.log10(code_rate_bulk)))
                     mantissa = code_rate_bulk / (10 ** power_of_ten)
-                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
+                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}", help="The effective code rate for the scenario of sending multiple tags regardless of identification.")
                 else:
-                    st.metric("Code Rate Bulk", f"{code_rate_bulk:.3f}")
+                    st.metric("Code Rate Bulk", f"{code_rate_bulk:.3f}", help="The effective code rate for the scenario of sending multiple tags regardless of identification.")
 
             with col2:
 
