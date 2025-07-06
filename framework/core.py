@@ -143,7 +143,7 @@ class RS2IDEncoder(IdEncoder):
             self.idcodes.generate_gf_inner(self.gf_exp)
             self.idcodes.initialize_gf(self.idcodes.get_exp_arr(), self.idcodes.get_log_arr(), self.gf_exp)
         elif self.gf_exp <= 32:
-            self.idcodes.generate_gf_inner(self.gf_exp // 2)
+            self.idcodes.generate_gf_inner(self.gf_exp)
             # self.idcodes.initialize_gf(self.idcodes.get_exp_arr_in(), self.idcodes.get_log_arr_in(), self.gf_exp // 2)
     
     
@@ -473,17 +473,26 @@ def generate_structured_messages(
             return [0] * (vec_len - 1) + [effective_attempt % (2 ** gf_exp)]
             
         elif pattern_type == "repeated_patterns":
-            patterns = [[0xAA, 0xBB], [0xFF, 0x00], [0x12, 0x34], [0xCA, 0xFE]]
-            # Add some worker-specific patterns
-            if worker_offset > 0:
-                patterns.append([worker_offset % 256, (worker_offset * 2) % 256])
+            # Select a base pattern based on the worker's offset to ensure
+            # different workers generate fundamentally different sequences.
+            base_patterns = [
+                [255, 0],
+                [170, 187],          # 0xAA, 0xBB
+                [85, 170],           # 0x55, 0xAA
+                [1, 2, 3, 4],
+                [15, 240, 15, 240],  # 0x0F, 0xF0
+                [10, 20, 30, 40]
+            ]
+            base_pattern = base_patterns[worker_offset % len(base_patterns)]
             
-            pattern_idx = effective_attempt % len(patterns)
-            pattern = patterns[pattern_idx]
-            shift = (effective_attempt // len(patterns)) % len(pattern)
-            rotated = pattern[shift:] + pattern[:shift]
-            offset = (effective_attempt // (len(patterns) * len(pattern))) % vec_len
-            return (([0] * offset) + rotated * ((vec_len + len(rotated) - 1) // len(rotated)))[:vec_len]
+            # Modify the base pattern with the attempt number to generate unique messages.
+            # This ensures that each message within a worker's sequence is unique.
+            pattern = [(p + effective_attempt) % (2**gf_exp) for p in base_pattern]
+            
+            # Tile the generated pattern to fill the message vector.
+            num_repeats = (vec_len + len(pattern) - 1) // len(pattern)
+            msg = (pattern * num_repeats)[:vec_len]
+            return msg
             
         elif pattern_type == "sparse":
             msg = [0] * vec_len

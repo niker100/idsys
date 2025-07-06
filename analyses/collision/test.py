@@ -60,36 +60,34 @@ def run_analysis(patterns):
 
     return all_results
 
-def calculate_kl_divergence_from_uniform(pdf_dict, alphabet_size=256):
-    entropy = 0.0
-    for prob in pdf_dict.values():
-        if prob > 0:
-            entropy -= prob * np.log2(prob)
-    kl_div = np.log2(alphabet_size) - entropy
-    return kl_div
+def calculate_renyi2_entropy(probs: List[float]) -> float:
+    """Calculates the Renyi-2 entropy H_2 = -log2(sum(p_i^2))."""
+    collision_prob = np.sum(np.square(probs))
+    if collision_prob <= 0:
+        return 0.0
+    return -np.log2(collision_prob)
 
-def plot_pdfs(all_results, patterns, systems):
-    """Plot the PDFs with empirical false positive rates and example messages."""
-    outdir = "analyses/collision"
-    os.makedirs(outdir, exist_ok=True)
-
-    
-def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/collision"):
+def process_and_save_results(all_results, patterns, systems, outdir="analyses/collision"):
+    """
+    Processes raw analysis results to calculate metrics (H_2, G_2),
+    saves them to a CSV, and returns a processed DataFrame.
+    """
     os.makedirs(outdir, exist_ok=True)
     rows = []
+    alphabet_size = 256
+    log2_q = np.log2(alphabet_size)
+
     for pattern in patterns:
-        # Get message PDF and examples
-        msg_pdf = all_results[pattern][0]['message_pdf']
-        all_symbols = list(range(256))
-        msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
-        # Calculate KL divergence for message PDF
-        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
-        # Calculate collision probability for message PDF
-        msg_collision_prob = float(np.sum(np.square(msg_probs)))
-        # Save the false positive rate for each system in a dict
-        fp_rates = {}
-        for idx, system_name in enumerate(systems):
-            fp_rates[system_name] = all_results[pattern][idx]['false_positive_rate']
+        # Get message PDF and examples from the first system's result (they are the same for all)
+        base_result = all_results[pattern][0]
+        msg_pdf_dict = base_result['message_pdf']
+        all_symbols = list(range(alphabet_size))
+        msg_probs = [msg_pdf_dict.get(symbol, 0.0) for symbol in all_symbols]
+        
+        # Calculate metrics for the message distribution
+        msg_h2 = calculate_renyi2_entropy(msg_probs)
+        
+        # Generate example messages
         vec_len = 16
         gf_exp = 8
         example_gen = generate_structured_messages(
@@ -105,139 +103,112 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
                 examples.append(next(example_gen))
         except StopIteration:
             pass
-        # Calculate theoretical collision probability (sum p^2) for message and tags
-        # Calculate G_KL (relative KL divergence gain) for each system
+
+        # Create the base row for the CSV
         row = {
             "pattern": pattern,
             "msg_pdf": msg_probs,
             "examples": examples,
-            "msg_kl_div": msg_kl_div,
-            "msg_collision_prob": msg_collision_prob
+            "msg_h2": msg_h2,
         }
-        # Add fp rates for each system
-        for system_name in systems:
-            row[f"fp_rate_{system_name}"] = fp_rates[system_name]
-        # Save tag PDFs, KL divergence, collision probability, G_KL for each system
+
+        # Process each system's results
         for idx, system_name in enumerate(systems):
-            tag_pdf = all_results[pattern][idx]['tag_pdf']
-            tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
-            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
-            tag_collision_prob = float(np.sum(np.square(tag_probs)))
-            # G_KL: relative KL divergence gain
-            if msg_kl_div > 1e-5:
-                g_kl = (msg_kl_div - tag_kl_div) / msg_kl_div
-            else:
-                g_kl = 0.0
+            result = all_results[pattern][idx]
+            tag_pdf_dict = result['tag_pdf']
+            tag_probs = [tag_pdf_dict.get(symbol, 0.0) for symbol in all_symbols]
+            
+            # Calculate metrics for the tag distribution
+            tag_h2 = calculate_renyi2_entropy(tag_probs)
+            
+            # Calculate normalized entropy gain G_2
+            if tag_h2 >= msg_h2: # Gain in entropy
+                g2 = (tag_h2 - msg_h2) / (log2_q - msg_h2) if log2_q > 0 else 0.0
+            else:  # Loss in entropy
+                g2 = (tag_h2 - msg_h2) / msg_h2 if msg_h2 > 0 else 0.0
+
+            # Add system-specific data to the row
+            row[f"fp_rate_{system_name}"] = result['false_positive_rate']
             row[f"tag_pdf_{system_name}"] = tag_probs
-            row[f"tag_kl_div_{system_name}"] = tag_kl_div
-            row[f"tag_collision_prob_{system_name}"] = tag_collision_prob
-            row[f"g_kl_{system_name}"] = g_kl
+            row[f"tag_h2_{system_name}"] = tag_h2
+            row[f"g2_{system_name}"] = g2
+            
         rows.append(row)
+
     df = pd.DataFrame(rows)
-    df.to_csv(os.path.join(outdir, "pdfs_and_examples.csv"), index=False)
-    print(f"Saved CSV to {os.path.join(outdir, 'pdfs_and_examples.csv')}")
+    csv_path = os.path.join(outdir, "pdfs_and_examples.csv")
+    df.to_csv(csv_path, index=False)
+    print(f"Saved CSV to {csv_path}")
+    return df
 
 
+def plot_results(processed_data, systems, outdir="analyses/collision"):
+    """Plot the PDFs with empirical false positive rates and example messages from processed data."""
+    os.makedirs(outdir, exist_ok=True)
+    
     # Publication-ready style
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.rcParams.update({
-        'font.size': 10,
-        'axes.titlesize': 12,
-        'axes.labelsize': 10,
-        'xtick.labelsize': 9,
-        'ytick.labelsize': 9,
-        'legend.fontsize': 9,
-        'figure.titlesize': 15,
-        'axes.titleweight': 'bold',
-        'axes.labelweight': 'bold',
-        'lines.linewidth': 1.3,
-        'lines.markersize': 4,
-        'figure.dpi': 150,
-        'savefig.dpi': 300,
-        'savefig.bbox': 'tight'
+        'font.size': 10, 'axes.titlesize': 12, 'axes.labelsize': 10,
+        'xtick.labelsize': 9, 'ytick.labelsize': 9, 'legend.fontsize': 9,
+        'figure.titlesize': 15, 'axes.titleweight': 'bold', 'axes.labelweight': 'bold',
+        'lines.linewidth': 1.3, 'lines.markersize': 4, 'figure.dpi': 150,
+        'savefig.dpi': 300, 'savefig.bbox': 'tight'
     })
 
-    for pattern in patterns:
-        msg_pdf = all_results[pattern][0]['message_pdf']
-        all_symbols = list(range(256))
-        msg_probs = [msg_pdf.get(symbol, 0.0) for symbol in all_symbols]
-        msg_kl_div = calculate_kl_divergence_from_uniform(msg_pdf)
-        msg_collision_prob = float(np.sum(np.square(msg_probs)))
-
+    for _, row in processed_data.iterrows():
+        pattern = row['pattern']
+        msg_probs = row['msg_pdf']
+        msg_h2 = row['msg_h2']
+        examples = row['examples']
+        
         fig = plt.figure(figsize=(30, 10))
         gs = fig.add_gridspec(2, len(systems) + 1, height_ratios=[0.8, 2.2], hspace=0.4, wspace=0.25)
 
         # Example messages (top row)
         ax_examples = fig.add_subplot(gs[0, :])
-        vec_len = 16
-        gf_exp = 8
-        example_gen = generate_structured_messages(
-            vec_len=vec_len,
-            pattern_type=pattern,
-            gf_exp=gf_exp,
-            target_count=3,
-            generate_first=False
-        )
-        examples = []
-        try:
-            for _ in range(3):
-                examples.append(next(example_gen))
-        except StopIteration:
-            pass
         if examples:
             example_matrix = np.array(examples)
             im = ax_examples.imshow(example_matrix, cmap='viridis', aspect='auto')
             ax_examples.set_title(f"Example Messages for '{pattern}' Pattern", fontweight='bold', pad=10)
             ax_examples.set_yticks(range(len(examples)))
             ax_examples.set_yticklabels([f"Example {i+1}" for i in range(len(examples))])
-            ax_examples.set_xticks(range(0, vec_len, 2))
-            ax_examples.set_xticklabels([str(x) for x in range(0, vec_len, 2)])
+            ax_examples.set_xticks(range(0, 16, 2))
+            ax_examples.set_xticklabels([str(x) for x in range(0, 16, 2)])
             cbar = fig.colorbar(im, ax=ax_examples, orientation='horizontal', pad=0.18, fraction=0.08, aspect=30)
             cbar.set_label('Byte Value')
         else:
             ax_examples.text(0.5, 0.5, f"No example messages available for '{pattern}'",
                              ha='center', va='center', fontsize=12)
-            ax_examples.set_xticks([])
-            ax_examples.set_yticks([])
-            ax_examples.axis('off')
+            ax_examples.set_xticks([]); ax_examples.set_yticks([]); ax_examples.axis('off')
 
         # Message PDF (bottom left)
         ax_msg = fig.add_subplot(gs[1, 0])
-        nonzero = np.count_nonzero(msg_probs)
+        all_symbols = list(range(len(msg_probs)))
         color = '#2C3E50'
         ax_msg.plot(all_symbols, msg_probs, marker='.', linestyle='-', linewidth=1.1, color=color, label='Message PDF')
         ax_msg.fill_between(all_symbols, msg_probs, alpha=0.15, color=color)
-        ax_msg.set_title(f"Message PDF\nKL div: {msg_kl_div:.3f}\nCollision Prob: {msg_collision_prob:.2e}", fontweight='bold', pad=8)
-        ax_msg.set_xlabel("Symbol Value")
-        ax_msg.set_ylabel("Probability")
-        ax_msg.set_ylim(0, max(msg_probs) * 1.15 if nonzero > 1 else 1.05)
-        ax_msg.grid(True, alpha=0.3)
-        ax_msg.legend(loc='upper right', frameon=False)
+        ax_msg.set_title(f"Message PDF\nH₂: {msg_h2:.3f}", fontweight='bold', pad=8)
+        ax_msg.set_xlabel("Symbol Value"); ax_msg.set_ylabel("Probability")
+        ax_msg.set_ylim(0, max(msg_probs) * 1.15 if np.count_nonzero(msg_probs) > 1 else 1.05)
+        ax_msg.grid(True, alpha=0.3); ax_msg.legend(loc='upper right', frameon=False)
 
         # Tag PDFs for each system (bottom row)
-        for idx, (system_name, result) in enumerate(zip(systems, all_results[pattern])):
-            tag_pdf = result['tag_pdf']
-            tag_probs = [tag_pdf.get(symbol, 0.0) for symbol in all_symbols]
-            nonzero_tag = np.count_nonzero(tag_probs)
-            tag_kl_div = calculate_kl_divergence_from_uniform(tag_pdf)
-            tag_collision_prob = float(np.sum(np.square(tag_probs)))
-            if msg_kl_div > 1e-5:
-                g_kl = (msg_kl_div - tag_kl_div) / msg_kl_div
-            else:
-                g_kl = 0.0
-            empirical_fpr = result['false_positive_rate']
+        for idx, system_name in enumerate(systems):
+            tag_probs = row[f'tag_pdf_{system_name}']
+            tag_h2 = row[f'tag_h2_{system_name}']
+            g2 = row[f'g2_{system_name}']
+            empirical_fpr = row[f'fp_rate_{system_name}']
+            
             ax_tag = fig.add_subplot(gs[1, idx + 1])
             ax_tag.plot(all_symbols, tag_probs, marker='.', linestyle='-', linewidth=1.1, color='#E74C3C', label='Tag PDF')
             ax_tag.fill_between(all_symbols, tag_probs, alpha=0.15, color='#E74C3C')
-            ax_tag.set_title(f"{system_name}\nKL div: {tag_kl_div:.3f}\nCollision Prob: {tag_collision_prob:.2e}\nG_KL: {g_kl:.2f}\nEmpirical FPR: {empirical_fpr:.6f}", fontweight='bold', pad=8)
+            ax_tag.set_title(f"{system_name}\n G₂: {g2:.2f}\n H₂: {tag_h2:.3f}\nEmpirical FPR: {empirical_fpr:.6f}", fontweight='bold', pad=8)
             ax_tag.set_xlabel("Symbol Value")
-            if idx == 0:
-                ax_tag.set_ylabel("Probability")
-            else:
-                ax_tag.set_ylabel("")
-            ax_tag.set_ylim(0, max(tag_probs) * 1.15 if nonzero_tag > 1 else 1.05)
-            ax_tag.grid(True, alpha=0.3)
-            ax_tag.legend(loc='upper right', frameon=False)
+            if idx == 0: ax_tag.set_ylabel("Probability")
+            else: ax_tag.set_ylabel("")
+            ax_tag.set_ylim(0, max(tag_probs) * 1.15 if np.count_nonzero(tag_probs) > 1 else 1.05)
+            ax_tag.grid(True, alpha=0.3); ax_tag.legend(loc='upper right', frameon=False)
 
         plt.suptitle(f"Probability Distribution Functions for '{pattern}' Pattern", fontsize=15, fontweight='bold', y=0.98)
         plt.subplots_adjust(top=0.90, bottom=0.08, left=0.06, right=0.98)
@@ -248,11 +219,14 @@ def save_pdfs_and_examples(all_results, patterns, systems, outdir="analyses/coll
 if __name__ == "__main__":
     
     patterns = ["random", "incremental", "repeated_patterns", "sparse", "low_entropy", "only_two"]
-    all_results = run_analysis(patterns)
-    # After analysis, plot PDFs
     systems = ["RAW", "RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"]
-    # all_results is created in run_analysis()
-    plot_pdfs(all_results, patterns, systems)
-    print("PDF plots saved in analyses/collision/")
 
-    save_pdfs_and_examples(all_results, patterns, systems)
+    # 1. Run the core analysis
+    all_results = run_analysis(patterns)
+    
+    # 2. Process results, calculate metrics, and save to CSV
+    processed_data = process_and_save_results(all_results, patterns, systems)
+
+    # 3. Generate plots from the processed data
+    plot_results(processed_data, systems)
+    print("PDF plots saved in analyses/collision/")

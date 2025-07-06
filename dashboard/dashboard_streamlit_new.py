@@ -90,9 +90,8 @@ if selected_dashboard == "PDF & Example Explorer":
             st.write(f"{num_examples} example(s) available for this pattern.")
 
             st.markdown("**Formulas:**")
-            st.latex(r"D_{KL}(p\,\|\,u) = \sum_i p_i \log_2 \frac{p_i}{1/N} = \log_2 |{\mathcal{X}| - H(p)}", help="KL Divergence of distribution p from uniform distribution u")
-            st.latex(r"P_{\text{collision}} = \sum_i p_i^2", help="Collision probability is the probability of picking the same tag twice")
-            st.latex(r"G_{KL} = \frac{D_{KL}(p_{message}\,\|\,u)-D_{KL}(p_{tag}\,\|\,u)}{D_{KL}(p_{message}\,\|\,u)}", help="Relative KL Divergence Gain measures the reduction in non-uniformity from message to tag. Higher is better. A value of 100% means the tags are perfectly uniform (random-like).")
+            st.latex(r"H_2(p) = -\log_2 \sum_i p_i^2", help="Rényi-2 entropy (also called collision entropy). It measures the uncertainty of the distribution. Higher is better (more uniform). Maximum value is 8 for a uniform 8-bit distribution.")
+            st.latex(r"G_2 = \begin{cases} \frac{H_2(p_{t}) - H_2(p_{m})}{H_2^{gain}} & H_2(p_t) >= H_2(p_m) \\ \frac{H_2(p_{t}) - H_2(p_{m})}{H_2^{loss}} & H_2(p_t) < H_2(p_m) \end{cases}", help=r"Normalized Entropy Gain measures the increase in entropy from the message to the tag distribution, normalized by the maximum gainable, resp. losable entropy. A value of 1.0 indicates the tag distribution is perfectly uniform. The maximum possible Rényi-entropy gain being $H_2^{gain} = \log_2(|\mathcal{X}|) - H_2(p_m)$ and the maximum possible loss $H_2^{loss}=H_2(p_m)$.")
                      
         
         # Display area
@@ -104,18 +103,16 @@ if selected_dashboard == "PDF & Example Explorer":
             tag_pdf = row[f"tag_pdf_{system}"]
 
             # Extract metrics for display
-            msg_kl_div = row.get('msg_kl_div', 0)
-            msg_collision_prob = row.get('msg_collision_prob', 0)
-            tag_kl_div = row.get(f'tag_kl_div_{system}', 0)
-            tag_collision_prob = row.get(f'tag_collision_prob_{system}', 0)
-            g_kl = row.get(f'g_kl_{system}', 0)
+            msg_h2 = row.get('msg_h2', 0)
+            tag_h2 = row.get(f'tag_h2_{system}', 0)
+            g2 = row.get(f'g2_{system}', 0)
             fp_rate = row.get(f'fp_rate_{system}', 0)
 
-            # 1. Make G_KL the most prominent metric
+            # 1. Make G_2 the most prominent metric
             st.metric(
-                label=f"Relative KL Divergence Gain (G_KL) for {system}",
-                value=f"{g_kl:.2%}",
-                help="Measures the reduction in non-uniformity from message to tag. Higher is better. A value of 100% means the tags are perfectly uniform (random-like)."
+                label=f"Normalized Entropy Gain (G₂) for {system}",
+                value=f"{g2:.3f}",
+                help="Measures the increase in entropy from message to tag, normalized by the maximum possible entropy (8 bits). Higher is better. A value of 1.0 means the tags are perfectly uniform."
             )
             st.markdown("---")
             
@@ -160,6 +157,7 @@ if selected_dashboard == "PDF & Example Explorer":
             
             with col_pdf1:
                 st.subheader("Message PDF")
+                st.metric("Message Rényi-2 Entropy (H₂)", f"{msg_h2:.3f}")
                 
                 # Create DataFrame for message PDF
                 msg_pdf_df = pd.DataFrame({
@@ -197,6 +195,7 @@ if selected_dashboard == "PDF & Example Explorer":
             
             with col_pdf2:
                 st.subheader(f"Tag PDF ({system})")
+                st.metric("Tag Rényi-2 Entropy (H₂)", f"{tag_h2:.3f}")
                 
                 # Create DataFrame for tag PDF
                 tag_pdf_df = pd.DataFrame({
@@ -234,36 +233,20 @@ if selected_dashboard == "PDF & Example Explorer":
 
             # 4. Detailed metrics at the bottom
             st.markdown("---")
-            st.subheader("Detailed Metrics")
-            mcol1, mcol2, mcol3 = st.columns(3)
+            st.subheader("System Performance")
+            mcol1, mcol2 = st.columns(2)
 
             with mcol1:
                 st.metric(
-                    label="Message KL Divergence",
-                    value=f"{msg_kl_div:.3f}",
-                    help="Measures how much the message distribution differs from a uniform one. Higher means less uniform. Ideally, this should be equal to the empirical false positive rate (FP Rate) of the system."
-                )
-                st.metric(
-                    label="Message Collision Prob.",
-                    value=f"{msg_collision_prob:.2e}",
-                    help="Probability that two randomly chosen messages are identical. Higher means less diverse."
+                    label="Empirical False Positive Rate",
+                    value=f"{fp_rate:.2e}",
+                    help="The measured probability of a random, non-matching message-tag pair being accepted as valid."
                 )
             with mcol2:
                 st.metric(
-                    label="Tag KL Divergence",
-                    value=f"{tag_kl_div:.3f}",
-                    help="Measures how much the tag distribution differs from a uniform one. Lower is better."
-                )
-                st.metric(
-                    label="Tag Collision Prob.",
-                    value=f"{tag_collision_prob:.2e}",
-                    help="Probability that two different messages produce the same tag. Lower is better."
-                )
-            with mcol3:
-                st.metric(
-                    label="False Positive Rate",
-                    value=f"{fp_rate:.2e}",
-                    help="The empirical probability of a random, non-matching message-tag pair being accepted as valid."
+                    label="Theoretical Collision Probability",
+                    value=f"{2**(-tag_h2):.2e}",
+                    help="The theoretical probability of two different messages producing the same tag, calculated from the tag entropy as P_collision = 2^(-H₂)."
                 )
 
 
