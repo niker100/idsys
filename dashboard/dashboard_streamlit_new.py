@@ -308,13 +308,34 @@ elif selected_dashboard == "FP Rate in k Identification":
             filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
 
         st.markdown(" ", help=pattern_explanations.get(selected_pattern, "No description available."))
-        
+
+        # Add theoretical_fp_rate to the chart data if available
+        # Assume theoretical_fp_rate is in filtered_data with columns: num_validation_messages, system_type, theoretical_fp_rate
+        theory_data = filtered_data_1[["num_validation_messages", "system_type", "theoretical_fp_rate"]].drop_duplicates()
+        theory_data = theory_data.rename(columns={"theoretical_fp_rate": "false_positive_rate"})
+        theory_data["system_type"] = "Theoretical Bound"
+
+        fp_is_zero = [1,1,1]
 
         # Pivot data for plotting multiple lines based on test_type
-        if not filtered_data_1.empty and not filtered_data_2.empty:
+        if not filtered_data_1.empty and not filtered_data_2.empty and not theory_data.empty:
+
+
 
             # combine the two filtered datasets
-            filtered_data = pd.concat([filtered_data_1, filtered_data_2])
+            # If every false positive rate in one set is always zero dont plot it
+            if (filtered_data_1["false_positive_rate"] == 0).all() and (filtered_data_2["false_positive_rate"] == 0).all():
+                # Both are all zero, show one (to avoid empty plot)
+                filtered_data = filtered_data_1
+                fp_is_zero = [0, 0, 1]
+            elif (filtered_data_1["false_positive_rate"] == 0).all():
+                filtered_data = filtered_data_2
+                fp_is_zero[0] = 0
+            elif (filtered_data_2["false_positive_rate"] == 0).all():
+                filtered_data = filtered_data_1
+                fp_is_zero[1] = 0
+            else:
+                filtered_data = pd.concat([filtered_data_1, filtered_data_2])
 
             pivot_fp_rate = filtered_data.pivot_table(
                 index="num_validation_messages",
@@ -322,25 +343,31 @@ elif selected_dashboard == "FP Rate in k Identification":
                 values="false_positive_rate"
             ).sort_index()
 
+            chart_data = pivot_fp_rate.reset_index().melt(
+                'num_validation_messages',
+                var_name='system_type',
+                value_name='false_positive_rate'
+            )       
+
+            if (theory_data["false_positive_rate"] == 0).all():
+                fp_is_zero[2] = 0
+            else:
+                # Add theoretical data to the chart data
+                theory_data = theory_data[theory_data["false_positive_rate"] > 0]
+                if fp_is_zero[0] == 0 and fp_is_zero[1] == 0    :
+                    chart_data = theory_data
+                else:
+                    chart_data = pd.concat([theory_data, chart_data], ignore_index=True)
+                    
+
 
     with col2:
         st.subheader("False Positive Rate")
         if not filtered_data.empty and 'pivot_fp_rate' in locals():
             # Line chart for false positive rate by vector length
-            chart_data = pivot_fp_rate.reset_index().melt(
-                'num_validation_messages',
-                var_name='vec_len',
-                value_name='false_positive_rate'
-            )
-
-            # Add theoretical_fp_rate to the chart data if available
-            # Assume theoretical_fp_rate is in filtered_data with columns: num_validation_messages, vec_len, theoretical_fp_rate
-            if "theoretical_fp_rate" in filtered_data.columns:
-                theory_data = filtered_data[["num_validation_messages", "vec_len", "theoretical_fp_rate"]].drop_duplicates()
-                theory_data = theory_data.rename(columns={"theoretical_fp_rate": "false_positive_rate"})
-                theory_data["vec_len"] = "Theoretical Bound"
-                chart_data = pd.concat([theory_data,chart_data], ignore_index=True)
             
+
+
             chart = (
                 alt.Chart(chart_data)
                 .mark_line(point=True)
@@ -355,12 +382,30 @@ elif selected_dashboard == "FP Rate in k Identification":
                         title="False Positive Rate",
                         scale=alt.Scale(type='log', base=10)
                     ),
-                    color=alt.Color("vec_len:N", legend=alt.Legend(title="Vector Length", orient="bottom")),
-                    tooltip=["num_validation_messages:Q", "vec_len:N", "false_positive_rate:Q"]
+                    color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
+                    tooltip=["num_validation_messages:Q", "system_type:N", "false_positive_rate:Q"]
                 )
                 .properties(width=700, height=400)
             )
             st.altair_chart(chart, use_container_width=True)
+
+            if fp_is_zero[0] == 0:
+                st.markdown(
+                    f"<span style='font-size:18px; color:red;'>FP is zero for {selected_system_1}</span>",
+                    unsafe_allow_html=True
+                )
+
+            if fp_is_zero[1] == 0:
+                st.markdown(
+                    f"<span style='font-size:18px; color:red;'>FP is zero for {selected_system_2}</span>",
+                    unsafe_allow_html=True
+                )
+
+            if fp_is_zero[2] == 0:
+                st.markdown(
+                    f"<span style='font-size:18px; color:red;'>FP is zero for Theoretical Bound</span>",
+                    unsafe_allow_html=True
+                )
 
             # Display metrics
             st.markdown(
@@ -504,7 +549,7 @@ elif selected_dashboard == "Execution Time vs. vec_len":
             )
 
     with col2:
-        st.subheader("Execution Time vs. Vector Length")
+        st.subheader("Execution Time")
         
         if not pivot_execution_time.empty:
             # Line chart for execution time vs. vec_len
@@ -548,7 +593,7 @@ elif selected_dashboard == "Execution Time vs. vec_len":
             st.write("No data available for the selected system and parameters.")
 
     with col3:
-        st.subheader("Throughput vs. Vector Length")
+        st.subheader("Throughput")
 
         if not pivot_throughput.empty:
 
