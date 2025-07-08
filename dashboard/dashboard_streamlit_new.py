@@ -286,6 +286,15 @@ elif selected_dashboard == "FP Rate in k Identification":
             filtered_data_1 = filtered_data_1[filtered_data_1["gf_exp"] == selected_gf_exp]
             filtered_data_2 = filtered_data_2[filtered_data_2["gf_exp"] == selected_gf_exp]
 
+        # Select message pattern
+        patterns = sorted(filtered_data_1["message_pattern"].unique())
+        if patterns:
+            selected_pattern = st.selectbox("Message pattern:", patterns)
+            filtered_data_1 = filtered_data_1[filtered_data_1["message_pattern"] == selected_pattern]
+            filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
+
+        st.markdown(" ", help=pattern_explanations.get(selected_pattern, "No description available."))
+
         # Select number of tags
         # Only show num_tags present in both datasets
         num_tags_1 = set(filtered_data_1["num_tags"].unique())
@@ -299,15 +308,6 @@ elif selected_dashboard == "FP Rate in k Identification":
             )
             filtered_data_1 = filtered_data_1[filtered_data_1["num_tags"] == selected_tag]
             filtered_data_2 = filtered_data_2[filtered_data_2["num_tags"] == selected_tag]
-
-        # Select message pattern
-        patterns = sorted(filtered_data_1["message_pattern"].unique())
-        if patterns:
-            selected_pattern = st.selectbox("Message pattern:", patterns)
-            filtered_data_1 = filtered_data_1[filtered_data_1["message_pattern"] == selected_pattern]
-            filtered_data_2 = filtered_data_2[filtered_data_2["message_pattern"] == selected_pattern]
-
-        st.markdown(" ", help=pattern_explanations.get(selected_pattern, "No description available."))
 
         # Add theoretical_fp_rate to the chart data if available
         # Assume theoretical_fp_rate is in filtered_data with columns: num_validation_messages, system_type, theoretical_fp_rate
