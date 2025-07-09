@@ -337,6 +337,8 @@ elif selected_dashboard == "FP Rate in k Identification":
             else:
                 filtered_data = pd.concat([filtered_data_1, filtered_data_2])
 
+            filtered_data = filtered_data[filtered_data["false_positive_rate"] > 0]
+
             pivot_fp_rate = filtered_data.pivot_table(
                 index="num_validation_messages",
                 columns="system_type",
