@@ -22,7 +22,7 @@ data = pd.read_csv(benchmark_file)
 st.set_page_config(layout="wide")
 
 # Add a sidebar for navigation
-dashboards = ["FP Rate in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
+dashboards = ["FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
 selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
 
 # Streamlit UI
@@ -250,8 +250,8 @@ if selected_dashboard == "PDF & Example Explorer":
                 )
 
 
-# Handle FP Rate in k Identification dashboard
-elif selected_dashboard == "FP Rate in k Identification":
+# Handle FP Ratio in k Identification dashboard
+elif selected_dashboard == "FP Ratio in k Identification":
 
     # Filter data for false positive rate
     filtered_data = data[data["test_type"] == "false_positive_rate"]
@@ -302,7 +302,7 @@ elif selected_dashboard == "FP Rate in k Identification":
         num_tags = sorted(num_tags_1 & num_tags_2)
         if num_tags:
             selected_tag = st.radio(
-                "Select number of tags:",
+                "Select number of tags t:",
                 num_tags,
                 format_func=lambda x: f"Tags: {x}"
             )
@@ -364,7 +364,7 @@ elif selected_dashboard == "FP Rate in k Identification":
 
 
     with col2:
-        st.subheader("False Positive Rate")
+        st.subheader("False Positive Ratio")
         if not filtered_data.empty and 'pivot_fp_rate' in locals():
             # Line chart for false positive rate by vector length
             
@@ -376,12 +376,12 @@ elif selected_dashboard == "FP Rate in k Identification":
                 .encode(
                     x=alt.X(
                         "num_validation_messages:Q",
-                        title="Number of Validation Messages",
+                        title="Number of Validated Messages",
                         scale=alt.Scale(type='log', base=2)
                     ),
                     y=alt.Y(
                         "false_positive_rate:Q",
-                        title="False Positive Rate",
+                        title="False Positive Ratio",
                         scale=alt.Scale(type='log', base=10)
                     ),
                     color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
@@ -433,45 +433,45 @@ elif selected_dashboard == "FP Rate in k Identification":
 
             with col1:
 
-                st.subheader(f"Code Rate for {selected_system_1}")
+                st.subheader(f"ID Code Rate for {selected_system_1}")
 
                 # Display metrics for first system type
                 code_rate_subseq = filtered_data_1['code_rate_subsequently'].mean()
                 if code_rate_subseq > 0:
                     power_of_ten = int(np.floor(np.log10(code_rate_subseq)))
                     mantissa = code_rate_subseq / (10 ** power_of_ten)
-                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}", help="The effective code rate for the scenario of sending more tags only if a positive identification is registered.")
+                    st.metric("ID Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}", help="The effective code rate for the scenario of sending more tags only if a positive identification is registered.")
                 else:
-                    st.metric("Code Rate Subsequently", f"{code_rate_subseq:.3f}", help="The effective code rate for the scenario of sending more tags only if a positive identification is registered.")
-                
+                    st.metric("ID Code Rate Subsequently", f"{code_rate_subseq:.3f}", help="The effective code rate for the scenario of sending more tags only if a positive identification is registered.")
+
                 code_rate_bulk = filtered_data_1['code_rate_bulk'].mean()
                 if code_rate_bulk > 0:
                     power_of_ten = int(np.floor(np.log10(code_rate_bulk)))
                     mantissa = code_rate_bulk / (10 ** power_of_ten)
-                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}", help="The effective code rate for the scenario of sending multiple tags regardless of identification.")
+                    st.metric("ID Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}", help="The effective code rate for the scenario of sending multiple tags regardless of identification.")
                 else:
-                    st.metric("Code Rate Bulk", f"{code_rate_bulk:.3f}", help="The effective code rate for the scenario of sending multiple tags regardless of identification.")
+                    st.metric("ID Code Rate Bulk", f"{code_rate_bulk:.3f}", help="The effective code rate for the scenario of sending multiple tags regardless of identification.")
 
             with col2:
 
-                st.subheader(f"Code Rate for {selected_system_2}")
+                st.subheader(f"ID Code Rate for {selected_system_2}")
 
                 # Display metrics for second system type
                 code_rate_subseq_2 = filtered_data_2['code_rate_subsequently'].mean()
                 if code_rate_subseq_2 > 0:
                     power_of_ten = int(np.floor(np.log10(code_rate_subseq_2)))
                     mantissa = code_rate_subseq_2 / (10 ** power_of_ten)
-                    st.metric("Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
+                    st.metric("ID Code Rate Subsequently", f"{mantissa:.2f}e{power_of_ten}")
                 else:
-                    st.metric("Code Rate Subsequently", f"{code_rate_subseq_2:.3f}")
+                    st.metric("ID Code Rate Subsequently", f"{code_rate_subseq_2:.3f}")
 
                 code_rate_bulk_2 = filtered_data_2['code_rate_bulk'].mean()
                 if code_rate_bulk_2 > 0:
                     power_of_ten = int(np.floor(np.log10(code_rate_bulk_2)))
                     mantissa = code_rate_bulk_2 / (10 ** power_of_ten)
-                    st.metric("Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
+                    st.metric("ID Code Rate Bulk", f"{mantissa:.2f}e{power_of_ten}")
                 else:
-                    st.metric("Code Rate Bulk", f"{code_rate_bulk_2:.3f}")
+                    st.metric("ID Code Rate Bulk", f"{code_rate_bulk_2:.3f}")
 
         else:
             st.write("No data available with current filter settings.")
