@@ -731,6 +731,11 @@ elif selected_dashboard == "System Type Comparison":
                     # Bar chart comparing throughput
                     all_system_types = sorted(data["system_type"].unique())
 
+                    # Calculate throughput in MBps (megabytes per second)
+                    # throughput_msgs_per_sec * vec_len / 1000000
+                    comparison_data = comparison_data.copy()
+                    comparison_data["throughput_MBps"] = comparison_data["throughput_msgs_per_sec"] * comparison_data["vec_len"] / 1000000
+
                     chart = (
                         alt.Chart(comparison_data)
                         .mark_bar()
@@ -742,11 +747,11 @@ elif selected_dashboard == "System Type Comparison":
                                 scale=alt.Scale(domain=all_system_types)
                             ),
                             y=alt.Y(
-                                "throughput_msgs_per_sec:Q",
-                                title="Messages Per Second (throughput)",
+                                "throughput_MBps:Q",
+                                title="Throughput (MB/s)",
                             ),
                             color=alt.Color("system_type:N", legend=None),
-                            tooltip=["system_type:N", "throughput_msgs_per_sec:Q", "vec_len:Q"]
+                            tooltip=["system_type:N", "throughput_MBps:Q", "vec_len:Q"]
                         )
                         .properties(width=700, height=400)
                     )
