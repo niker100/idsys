@@ -313,7 +313,7 @@ elif selected_dashboard == "FP Ratio in k Identification":
         # Assume theoretical_fp_rate is in filtered_data with columns: num_validation_messages, system_type, theoretical_fp_rate
         theory_data = filtered_data_1[["num_validation_messages", "system_type", "theoretical_fp_rate"]].drop_duplicates()
         theory_data = theory_data.rename(columns={"theoretical_fp_rate": "false_positive_rate"})
-        theory_data["system_type"] = "Theoretical Bound"
+        theory_data["system_type"] = "Average Error"
 
         fp_is_zero = [1,1,1]
 
