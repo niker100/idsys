@@ -367,9 +367,6 @@ elif selected_dashboard == "FP Ratio in k Identification":
         st.subheader("False Positive Ratio")
         if not filtered_data.empty and 'pivot_fp_rate' in locals():
             # Line chart for false positive rate by vector length
-            
-
-
             chart = (
                 alt.Chart(chart_data)
                 .mark_line(point=True)
@@ -694,9 +691,16 @@ elif selected_dashboard == "System Type Comparison":
                 # Always show all system types on the x-axis, even if some are missing in the filtered data
                 all_system_types = sorted(data["system_type"].unique())
 
+                # Determine min/max for y axis across all relevant data
+                min_exec_time = data["avg_execution_time_ms"].min()
+                max_exec_time = data["avg_execution_time_ms"].max()
+                y_domain_execution_time = [min_exec_time * 0.8, max_exec_time * 1.2]
+
                 chart = (
                     alt.Chart(comparison_data)
-                    .mark_bar()
+                    .mark_circle(
+                        size=100,  # Adjust size for better visibility
+                    )
                     .encode(
                         x=alt.X(
                             "system_type:N",
@@ -707,6 +711,7 @@ elif selected_dashboard == "System Type Comparison":
                         y=alt.Y(
                             "avg_execution_time_ms:Q",
                             title="Avg Execution Time (ms)",
+                            scale=alt.Scale(type='log', domain=y_domain_execution_time)
                         ),
                         color=alt.Color("system_type:N", legend=None),
                         tooltip=["system_type:N", "avg_execution_time_ms:Q", "vec_len:Q"]
