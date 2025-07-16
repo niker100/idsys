@@ -1,123 +1,216 @@
-# Identification System Framework
+# IDSYS: Identification Systems Framework
 
-A comprehensive Python framework for creating, evaluating, and visualizing identification systems. This framework provides tools for implementing various identification coding schemes, measuring their performance, and optimizing their computational efficiency through detailed parameter space analysis.
+IDSYS is a comprehensive framework for creating, evaluating, and visualizing identification systems based on various coding schemes. It provides tools to analyze the performance, reliability, and efficiency of identification schemes across multiple parameters.
 
 ## Overview
 
-Identification systems are communication systems where a sender (Alice) encodes a message, and a receiver (Bob) needs to determine whether the received codeword corresponds to a specific message. This differs from traditional communication where Bob needs to decode which message was sent.
+The framework implements and evaluates different identification systems including:
 
-This framework implements:
+- Reed-Solomon Identification (RSID)
+- Concatenated Reed-Solomon Identification (RS2ID)
+- Reed-Muller Identification (RMID)
+- Cryptographic hash-based identification (SHA1ID, SHA256ID)
 
-1. Different identification system encoding schemes (e.g., Reed-Solomon-based tagging)
-2. Metrics for evaluating performance (reliability, error rates, collision probability, efficiency)
-3. Advanced visualization tools for analysis and parameter optimization
-4. Computational efficiency analysis to evaluate real-world performance
-5. Multi-parameter optimization across alphabet sizes and ECC configurations
+IDSYS allows systematic analysis of these systems across different parameters including Galois field sizes, message lengths, tag positions, and message patterns.
 
-## Structure
+## Installation
 
-The framework consists of the following components:
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/idsys.git
+cd idsys
 
-- `core.py`: Base classes and implementations for identification systems (e.g., PaperTaggingEncoder)
-- `metrics.py`: Functions for measuring system performance
-- `utils.py`: Utility functions for visualization and testing
-- `analyze_single_symbol_tag.py`: In-depth analysis of single-symbol tag performance
-- `system_comparison.py`: Comprehensive system optimization across parameters
-
-## Usage
-
-### Creating an Identification System
-
-```python
-from framework import create_id_system, utils
-
-# Create a Reed-Solomon-based identification system
-rs_system = create_id_system("paper_tagging", {
-    "message_length": 64,
-    "nsym": 16,
-    "code_length": 1
-})
-
-# Generate test messages
-messages = utils.generate_test_messages(count=100, length=64, alphabet_size=4)
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-### Evaluating System Performance
+## Directory Structure
+
+```
+idsys/
+├── framework/           # Core framework code
+│   ├── __init__.py
+│   ├── core.py          # Core classes and functions
+│   ├── metrics.py       # Evaluation metrics
+│   ├── checkpoint.py    # Checkpointing for long analyses
+│   └── utils.py         # Utility functions
+├── analyses/            # Analysis scripts
+│   ├── minimal_example.py
+│   ├── gf_exp_influence/
+│   ├── vec_length_influence/
+│   ├── tag_position/
+│   ├── num_messages_influence/
+│   ├── collision/
+│   └── ...
+└── dashboard/           # Interactive visualization
+    ├── dashboard_streamlit.py
+    ├── dashboard_streamlit_new.py
+    └── start_dashboard.md
+```
+
+## Core Concepts
+
+### Identification Systems
+
+An identification system in this framework consists of:
+
+- **Encoder**: Generates tags from messages
+- **Verifier**: Validates if a tag corresponds to a given message
+
+```python
+from framework import create_id_system
+
+# Create an RS identification system
+rsid = create_id_system("RSID", {"gf_exp": 8, "tag_pos": [2]})
+
+# Encode a message
+tag = rsid.send(message)
+
+# Verify a message against a tag
+is_valid = rsid.receive(tag, message)
+```
+
+### Message Generation
+
+The framework provides utilities to generate test messages with various patterns:
+
+```python
+from framework import generate_test_messages
+
+# Generate random messages
+messages = generate_test_messages(vec_len=16, gf_exp=8, count=100)
+
+# Generate structured messages with specific patterns
+from framework.core import generate_structured_messages
+
+structured_msgs = generate_structured_messages(
+    vec_len=16,
+    pattern_type="repeated_patterns",  # Options: random, incremental, repeated_patterns, sparse, low_entropy, only_two
+    gf_exp=8,
+    target_count=100
+)
+```
+
+### Metrics and Evaluation
+
+The framework includes comprehensive metrics for system evaluation:
 
 ```python
 from framework import IdMetrics
 
-# Calculate reliability and measure computation time
-reliability, avg_time = measure_computation_time_from_reliability(rs_system, messages, num_trials=1000)
-print(f"System reliability: {reliability:.4f}")
-print(f"Average operation time: {avg_time:.4f} ms")
+# Evaluate a single system
+metrics = IdMetrics.evaluate_system(
+    system=rsid,
+    vec_len=16,
+    num_messages=10000
+)
 
-# Calculate error rates
-error_rates = IdMetrics.error_rates(rs_system, messages, num_trials=500)
-print(f"False positive rate: {error_rates['false_positive_rate']:.4f}")
-print(f"False negative rate: {error_rates['false_negative_rate']:.4f}")
-
-# Calculate efficiency metrics
-efficiency = IdMetrics.efficiency(rs_system)
-print(f"Effective code rate: {efficiency['effective_code_rate']:.4f}")
-
-# Calculate computational efficiency
-computational_efficiency = efficiency['effective_code_rate'] / avg_time * 1000
-print(f"Computational efficiency: {computational_efficiency:.2f}")
+# Compare multiple systems
+system_comparison = IdMetrics.compare_systems(
+    systems={"RSID": rsid, "SHA1ID": sha1id},
+    num_messages=10000,
+    vec_len=16
+)
 ```
 
-## Running Analysis Scripts
+### Checkpointing for Long Analyses
 
-The framework includes specialized scripts for analyzing different aspects of identification systems:
+For long-running analyses, the framework provides checkpointing:
 
-```powershell
-# Run single symbol tag analysis
-python analyze_single_symbol_tag.py
+```python
+from framework.checkpoint import create_checkpoint_manager
 
-# Run system comparison and optimization
-python system_comparison.py
+# Create checkpoint manager
+checkpoint = create_checkpoint_manager(
+    output_dir="output/my_analysis",
+    analysis_name="parameter_sweep",
+    save_interval=10
+)
+
+# Initialize with all parameter sets to test
+remaining_params = checkpoint.initialize_analysis(parameter_sets)
+
+# Process each parameter combination
+for params in remaining_params:
+    result = analyze_single_combination(params)
+    checkpoint.add_result(params, result)
+
+# Finalize and get results
+checkpoint.finalize_analysis()
+results_df = checkpoint.get_results_dataframe()
 ```
 
-These scripts generate comprehensive performance visualizations in the respective output directories.
+## Running Analyses
 
-## Key Visualization Examples
+The analyses directory contains scripts for evaluating different aspects of identification systems:
 
-| System Performance Overview | Parameter Optimization Analysis |
-|----------------------------|----------------------------------|
-| ![Single-Symbol Tag Performance Analysis](output/single_symbol_tag_analysis/summary_visualization.png) | ![Parameter Space Analysis](output/system_comparison/parameter_space_multi_curve_a8_c1.png) |
-| **Trade-off Analysis** | **Optimal Configuration Analysis** |
-| ![Computational Efficiency vs Code Rate](output/system_comparison/computation_tradeoff_analysis.png) | ![Optimal Configuration Analysis](output/system_comparison/optimal_configuration_with_timing.png) |
+```bash
+# Run minimal example
+python analyses/minimal_example.py
 
-- **Single-Symbol Tag Performance Analysis**: Shows the effects of error correction, message length, alphabet size, and message count on system performance.
-- **Parameter Space Analysis**: Explores multiple nsym curves to find optimal configurations that balance reliability and computational efficiency.
-- **Trade-off Analysis**: Compares max code rate and max efficiency configurations across alphabet sizes.
-- **Optimal Configuration Analysis**: Shows optimized parameters and computational metrics for different alphabet sizes.
+# Run GF exponent influence analysis with checkpointing
+python analyses/gf_exp_influence/gf_exp_checkpointed.py
 
-## Components
+# Run tag position influence analysis
+python analyses/tag_position/tag_position.py
+```
 
-### Encoders
+## Interactive Dashboard
 
-- **PaperTaggingEncoder**: Uses Reed-Solomon codes for robust identification with configurable ECC symbols
+IDSYS includes a Streamlit dashboard for visualizing results:
 
-### Decoders
+```bash
+# Navigate to dashboard directory
+cd dashboard
 
-- **PaperTaggingDecoder**: Verifies tags using Reed-Solomon code structure
+# Start the dashboard
+streamlit run dashboard_streamlit.py
+```
 
-### Metrics
+The dashboard provides interactive exploration of:
+- False positive rates for identification systems
+- Execution time comparisons
+- System type comparisons
+- Probability distribution functions & examples
 
-- **Reliability**: Probability of correct identification
-- **Error Rates**: False positive and false negative rates
-- **Collision Probability**: Likelihood of messages being confused
-- **Efficiency**: Code rate and encoding time
-- **Computational Efficiency**: Performance metric balancing code rate and computation time
+## Example Analyses
 
-### Visualization Tools
+### Comprehensive Benchmark
 
-- Parameter space exploration with multiple curves
-- Trade-off analysis between code rate and computation time
-- Computational efficiency analysis
-- Comprehensive performance dashboards
+```bash
+# Run comprehensive benchmark of all systems
+python analyses/big_script/big_script.py
+```
 
-## References
+This script evaluates all identification systems across:
+- Multiple system types (RSID, RMID, SHA1ID, etc.)
+- Various Galois field exponents (8, 16, 32, 64)
+- Different vector lengths
+- Multiple message patterns
 
-For more information about identification coding, refer to the literature in the `literature/` folder.
+### Collision Analysis
+
+```bash
+# Run collision analysis
+python analyses/collision/test.py
+```
+
+Analyzes collision behavior between random and structured messages across different system types.
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+This framework utilizes the `ecidcodes` library for implementing Reed-Solomon and Reed-Muller identification codes.
+
+Similar code found with 2 license types
