@@ -25,12 +25,12 @@ def run_analysis(patterns):
     
     vec_len = 16
     gf_exp = 8
-    target_messages = 10**7
+    target_messages = 10**5
     
     systems = {
         "RAW": create_id_system("NoCode", {"gf_exp": gf_exp}),
-        "RSID": create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [2]}),
-        "RS2ID": create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": [2], "tag_pos_in": [2]}),     
+        "RSID": create_id_system("RSID", {"gf_exp": gf_exp, "tag_pos": [4]}),
+        "RS2ID": create_id_system("RS2ID", {"gf_exp": gf_exp, "tag_pos": [4], "tag_pos_in": [3]}),     
         "RMID": create_id_system("RMID", {"gf_exp": gf_exp, "tag_pos": [2], "rm_order": 1}),
         "SHA1ID": create_id_system("SHA1ID", {"gf_exp": gf_exp}),
         "SHA256ID": create_id_system("SHA256ID", {"gf_exp": gf_exp})

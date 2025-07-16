@@ -470,7 +470,7 @@ def generate_structured_messages(
             return msg
             
         elif pattern_type == "incremental":
-            return [0] * (vec_len - 1) + [effective_attempt % (2 ** gf_exp)]
+            return [0] * (vec_len - 1) + [effective_attempt % (2 ** 8)]
             
         elif pattern_type == "repeated_patterns":
             # Select a base pattern based on the worker's offset to ensure
