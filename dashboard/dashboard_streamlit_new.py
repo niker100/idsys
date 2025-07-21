@@ -22,7 +22,7 @@ data = pd.read_csv(benchmark_file)
 st.set_page_config(layout="wide")
 
 # Add a sidebar for navigation
-dashboards = ["FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
+dashboards = ["FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PMF & Example Explorer"]
 selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
 
 # Streamlit UI
@@ -38,13 +38,13 @@ pattern_explanations = {
     "sparse": "Messages are mostly zeros, with few non-zero byte (255) at a different positions in each message."
 }
 
-# Handle PDF & Example Explorer separately (different layout)
-if selected_dashboard == "PDF & Example Explorer":
-    # Load the PDF and examples CSV
+# Handle PMF & Example Explorer separately (different layout)
+if selected_dashboard == "PMF & Example Explorer":
+    # Load the PMF and examples CSV
     pdf_csv_path = script_dir.parent / "analyses" / "collision" / "pdfs_and_examples.csv"
     
     if not pdf_csv_path.exists():
-        st.warning("PDF/example data not found. Please run the collision analysis first.")
+        st.warning("PMF/example data not found. Please run the collision analysis first.")
         st.info(f"Expected file location: {pdf_csv_path}")
     else:
         # Load the data
@@ -65,7 +65,7 @@ if selected_dashboard == "PDF & Example Explorer":
         system_cols = [col for col in pdf_df.columns if col.startswith("tag_pdf_")]
         system_names = [col.replace("tag_pdf_", "") for col in system_cols]
         
-        # Parse tag PDFs
+        # Parse tag PMFs
         for col in system_cols:
             pdf_df[col] = pdf_df[col].apply(parse_list)
         
@@ -78,8 +78,8 @@ if selected_dashboard == "PDF & Example Explorer":
             # Select message pattern
             pattern = st.radio("Select Message Pattern:", pdf_df["pattern"].unique(), )
             
-            # Select system for tag PDF
-            system = st.radio("Select System for Tag PDF:", system_names)
+            # Select system for tag PMF
+            system = st.radio("Select System for Tag PMF:", system_names)
             
             # Display metadata
             st.subheader("Pattern Info")
@@ -151,19 +151,19 @@ if selected_dashboard == "PDF & Example Explorer":
             else:
                 st.info("No example messages available for this pattern.")
             
-            # 3. Message and Tag PDFs side by side
+            # 3. Message and Tag PMFs side by side
             st.markdown("---")
             col_pdf1, col_pdf2 = st.columns(2)
             
             with col_pdf1:
-                st.subheader("Message PDF")
+                st.subheader("Message PMF")
                 st.metric("Message Rényi-2 Entropy (H₂)", f"{msg_h2:.3f}")
                 
-                # Create DataFrame for message PDF
+                # Create DataFrame for message PMF
                 msg_pdf_df = pd.DataFrame({
                     'Symbol': range(256),
                     'Probability': msg_pdf,
-                    'Type': 'Message PDF'
+                    'Type': 'Message PMF'
                 })
                 
                 # Filter out zeros for better visualization
@@ -194,10 +194,10 @@ if selected_dashboard == "PDF & Example Explorer":
                 st.altair_chart((msg_area + msg_chart), use_container_width=True)
             
             with col_pdf2:
-                st.subheader(f"Tag PDF ({system})")
+                st.subheader(f"Tag PMF ({system})")
                 st.metric("Tag Rényi-2 Entropy (H₂)", f"{tag_h2:.3f}")
                 
-                # Create DataFrame for tag PDF
+                # Create DataFrame for tag PMF
                 tag_pdf_df = pd.DataFrame({
                     'Symbol': range(256),
                     'Probability': tag_pdf,
@@ -476,7 +476,14 @@ elif selected_dashboard == "FP Ratio in k Identification":
 # Handle execution time vs. vector length dashboard
 elif selected_dashboard == "Execution Time vs. vec_len":
     # Filter data for execution time
-    filtered_data = data[data["test_type"] == "execution_time"]
+
+
+    execution_time_data = data[data["test_type"] == "execution_time"]
+    
+    # Calculate throughput in MBps (megabytes per second)
+    # throughput_msgs_per_sec * vec_len / 1000000
+    execution_time_data = execution_time_data.copy()
+    execution_time_data["throughput_MBps"] = execution_time_data["throughput_msgs_per_sec"] * execution_time_data["vec_len"] / 1000000
 
     # Create three columns: controls and chart
     col1, col2, col3 = st.columns([1, 2, 2])  # Adjust ratio as needed
@@ -485,13 +492,13 @@ elif selected_dashboard == "Execution Time vs. vec_len":
         st.subheader("Controls")
 
         # Select system type
-        system_types = sorted(filtered_data["system_type"].unique())
+        system_types = sorted(execution_time_data["system_type"].unique())
         selected_system_1 = st.selectbox("Select system type 1:", system_types)
         selected_system_2 = st.selectbox("Select system type 2:", system_types)
 
         # Filter data by selected system type
-        filtered_data_1 = filtered_data[filtered_data["system_type"] == selected_system_1]
-        filtered_data_2 = filtered_data[filtered_data["system_type"] == selected_system_2]
+        filtered_data_1 = execution_time_data[execution_time_data["system_type"] == selected_system_1]
+        filtered_data_2 = execution_time_data[execution_time_data["system_type"] == selected_system_2]
 
         # Select GF exponent
         # Only show GF exponents present in both datasets
@@ -518,7 +525,7 @@ elif selected_dashboard == "Execution Time vs. vec_len":
             filtered_data_2 = filtered_data_2[filtered_data_2["num_tags"] == selected_num_tags]
 
         # Display metrics
-        avg_messages = filtered_data['num_messages'].mean()
+        avg_messages = execution_time_data['num_messages'].mean()
         if avg_messages > 0:
             power_of_ten = int(np.floor(np.log10(avg_messages)))
         else:
@@ -542,7 +549,7 @@ elif selected_dashboard == "Execution Time vs. vec_len":
 
             pivot_throughput = filtered_data.pivot_table(
                 index="vec_len",
-                values="throughput_msgs_per_sec",
+                values="throughput_MBps",
                 columns="system_type",
                 aggfunc="mean"
             )
@@ -597,8 +604,8 @@ elif selected_dashboard == "Execution Time vs. vec_len":
         if not pivot_throughput.empty:
 
             # Determine min/max for y axis across all relevant data
-            min_throughput = data["throughput_msgs_per_sec"].min()
-            max_throughput = data["throughput_msgs_per_sec"].max()
+            min_throughput = execution_time_data["throughput_MBps"].min()
+            max_throughput = execution_time_data["throughput_MBps"].max()
 
             # Set some padding for better visualization
             y_domain_throughput = [min_throughput * 0.8, max_throughput * 1.2]
@@ -607,7 +614,7 @@ elif selected_dashboard == "Execution Time vs. vec_len":
             chart_data = pivot_throughput.reset_index().melt(
                 id_vars=["vec_len"],
                 var_name="system_type",
-                value_name="throughput_msgs_per_sec"
+                value_name="throughput_MBps"
             )
             chart = (
                 alt.Chart(chart_data)
@@ -619,12 +626,12 @@ elif selected_dashboard == "Execution Time vs. vec_len":
                         scale=alt.Scale(type='log', base=2, domain=x_domain_vec_len)
                     ),
                     y=alt.Y(
-                        "throughput_msgs_per_sec:Q",
-                        title="Messages Per Second (throughput)",
+                        "throughput_MBps:Q",
+                        title="Throughput (MB/s)",
                         scale=alt.Scale(type='log', domain=y_domain_throughput)
                     ),
                     color=alt.Color("system_type:N", legend=alt.Legend(title="System Type", orient="bottom")),
-                    tooltip=["vec_len:Q", "throughput_msgs_per_sec:Q", "system_type:N", "num_tags:Q"]
+                    tooltip=["vec_len:Q", "throughput_MBps:Q", "system_type:N", "num_tags:Q"]
                 )
                 .properties(width=700, height=400)
             )
@@ -635,7 +642,7 @@ elif selected_dashboard == "Execution Time vs. vec_len":
 # Handle system type comparison dashboard
 elif selected_dashboard == "System Type Comparison":
     # Filter data for system type comparison
-    filtered_data = data[data["test_type"] == "execution_time"]
+    execution_time_data = data[data["test_type"] == "execution_time"]
 
     # Create two columns: controls and chart
     col1, col2 = st.columns([1, 4])  # Adjust ratio as needed
@@ -644,15 +651,15 @@ elif selected_dashboard == "System Type Comparison":
         st.subheader("Controls")
 
         # Select GF exponent
-        gf_exps = sorted(filtered_data["gf_exp"].unique())
+        gf_exps = sorted(execution_time_data["gf_exp"].unique())
         if gf_exps:
             selected_gf_exp = st.radio(
                 "Select GF exponent:",
                 gf_exps,
                 format_func=lambda x: f"GF(2^{x})"
             )
-            filtered_data = filtered_data[filtered_data["gf_exp"] == selected_gf_exp]
-        
+            filtered_data = execution_time_data[execution_time_data["gf_exp"] == selected_gf_exp]
+
         # Select number of tags
         num_tags = sorted(filtered_data["num_tags"].unique())
         if num_tags:
