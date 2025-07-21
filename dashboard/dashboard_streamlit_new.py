@@ -22,7 +22,7 @@ data = pd.read_csv(benchmark_file)
 st.set_page_config(layout="wide")
 
 # Add a sidebar for navigation
-dashboards = ["FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PDF & Example Explorer"]
+dashboards = ["FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PMF & Example Explorer"]
 selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
 
 # Streamlit UI
@@ -38,13 +38,13 @@ pattern_explanations = {
     "sparse": "Messages are mostly zeros, with few non-zero byte (255) at a different positions in each message."
 }
 
-# Handle PDF & Example Explorer separately (different layout)
-if selected_dashboard == "PDF & Example Explorer":
-    # Load the PDF and examples CSV
+# Handle PMF & Example Explorer separately (different layout)
+if selected_dashboard == "PMF & Example Explorer":
+    # Load the PMF and examples CSV
     pdf_csv_path = script_dir.parent / "analyses" / "collision" / "pdfs_and_examples.csv"
     
     if not pdf_csv_path.exists():
-        st.warning("PDF/example data not found. Please run the collision analysis first.")
+        st.warning("PMF/example data not found. Please run the collision analysis first.")
         st.info(f"Expected file location: {pdf_csv_path}")
     else:
         # Load the data
@@ -65,7 +65,7 @@ if selected_dashboard == "PDF & Example Explorer":
         system_cols = [col for col in pdf_df.columns if col.startswith("tag_pdf_")]
         system_names = [col.replace("tag_pdf_", "") for col in system_cols]
         
-        # Parse tag PDFs
+        # Parse tag PMFs
         for col in system_cols:
             pdf_df[col] = pdf_df[col].apply(parse_list)
         
@@ -78,8 +78,8 @@ if selected_dashboard == "PDF & Example Explorer":
             # Select message pattern
             pattern = st.radio("Select Message Pattern:", pdf_df["pattern"].unique(), )
             
-            # Select system for tag PDF
-            system = st.radio("Select System for Tag PDF:", system_names)
+            # Select system for tag PMF
+            system = st.radio("Select System for Tag PMF:", system_names)
             
             # Display metadata
             st.subheader("Pattern Info")
@@ -151,19 +151,19 @@ if selected_dashboard == "PDF & Example Explorer":
             else:
                 st.info("No example messages available for this pattern.")
             
-            # 3. Message and Tag PDFs side by side
+            # 3. Message and Tag PMFs side by side
             st.markdown("---")
             col_pdf1, col_pdf2 = st.columns(2)
             
             with col_pdf1:
-                st.subheader("Message PDF")
+                st.subheader("Message PMF")
                 st.metric("Message Rényi-2 Entropy (H₂)", f"{msg_h2:.3f}")
                 
-                # Create DataFrame for message PDF
+                # Create DataFrame for message PMF
                 msg_pdf_df = pd.DataFrame({
                     'Symbol': range(256),
                     'Probability': msg_pdf,
-                    'Type': 'Message PDF'
+                    'Type': 'Message PMF'
                 })
                 
                 # Filter out zeros for better visualization
@@ -194,10 +194,10 @@ if selected_dashboard == "PDF & Example Explorer":
                 st.altair_chart((msg_area + msg_chart), use_container_width=True)
             
             with col_pdf2:
-                st.subheader(f"Tag PDF ({system})")
+                st.subheader(f"Tag PMF ({system})")
                 st.metric("Tag Rényi-2 Entropy (H₂)", f"{tag_h2:.3f}")
                 
-                # Create DataFrame for tag PDF
+                # Create DataFrame for tag PMF
                 tag_pdf_df = pd.DataFrame({
                     'Symbol': range(256),
                     'Probability': tag_pdf,
