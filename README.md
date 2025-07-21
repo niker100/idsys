@@ -212,5 +212,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 This framework utilizes the `ecidcodes` library for implementing Reed-Solomon and Reed-Muller identification codes.
-
-Similar code found with 2 license types
