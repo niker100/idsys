@@ -1,5 +1,7 @@
 # IDSYS: Identification Systems Analysis Framework
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 IDSYS is a comprehensive framework for creating, evaluating, and benchmarking identification systems based on various coding schemes. It provides tools to analyze performance, reliability, and efficiency across multiple parameters.
 
 ## Overview

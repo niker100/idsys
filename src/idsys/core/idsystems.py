@@ -9,6 +9,9 @@ concatenated Reed-Solomon (RS2ID), Reed-Muller (RMID), and hash-based systems (S
 The module follows a clean architecture pattern with separate encoder and verifier classes
 for each identification system type, unified under a common IdSystem interface.
 
+Copyright (c) 2025 niker100
+Licensed under the MIT License - see LICENSE file for details
+
 Classes:
     IdEncoder: Abstract base class for all encoders
     IdVerifier: Abstract base class for all verifiers  

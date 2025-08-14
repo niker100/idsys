@@ -1,5 +1,8 @@
 """
 IDSYS - Identification Systems Analysis Framework
+
+Copyright (c) 2025 niker100
+Licensed under the MIT License - see LICENSE file for details
 """
 
 __version__ = "0.1.0"
