@@ -1,0 +1,160 @@
+% \usepackage[ansinew, utf8]{inputenc}
+% %\usepackage[english]{babel}
+% \usepackage{lmodern}
+% \usepackage{hyphsubst} %Verbesserte Silbentrennung
+
+
+% %\usepackage{amstext}
+% %\usepackage{amssymb}		% Zusätzliche Symbole
+% \usepackage{amsmath} 		% Erweiterter Formelsatz, Basispaket
+% %%\usepackage{amsthm} 		% Theorem and proof
+% %\usepackage{amsfonts}
+% %\usepackage{pifont}		% Schriftart für Formeln
+% %\usepackage{trsym}         % Laplace / Fourier transform symbols
+% \usepackage{mathtools}
+% \usepackage{booktabs}
+% \usepackage{tabulary}
+
+% \usepackage{hyperref}
+% \usepackage{cleveref}
+% \usepackage{listings}
+% \usepackage{color}
+% \usepackage{wrapfig}
+% \usepackage{tikz}
+% \usetikzlibrary[shapes,positioning]
+% \usepackage{chngcntr}
+% %\counterwithout{figure}{chapter}
+% \usepackage{framed}
+% \usepackage{multicol}		% Mehrere Spalten
+% \usepackage{pgfplots} %Plot erstellen
+% \pgfplotsset{compat=1.16} %Plot aktuelle Version
+% \usepackage[ngerman]{datetime}
+% \usepackage{longtable}
+
+% \AddToHook{cmd/section/before}{\clearpage}
+
+% \lstset
+% {
+%     numbers=left,
+%     stepnumber=1,
+%     firstnumber=1,
+%     numberfirstline=true,
+%     basicstyle=\ttfamily,        % the size of the fonts that are used for the code
+%     breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
+%     breaklines=true,                 % sets automatic line breaking
+%     captionpos=b,                    % sets the caption-position to bottom
+%     commentstyle=\color{cdgreen},    % comment style
+%     deletekeywords={...},            % delete keywords from the given language
+%     escapeinside={\%*(}{*)},       % if you want to add LaTeX within your code
+%     emphstyle=\bfseries,
+%     language=Python,
+%     moredelim=[is][\bfseries]{\$\$\$}{\$\$\$},
+%     %extendedchars=true,              % lets you use non-ASCII characters; for 8-bits encodings only, does not work with UTF-8
+%     frame=single,	                   % adds a frame around the code
+%     keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
+%     keywordstyle=\color{cddarkblue},       % keyword style
+%     morekeywords={*,...},            % if you want to add more keywords to the set
+%     rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+%     showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
+%     showstringspaces=false,          % underline spaces within strings only
+%     showtabs=false,                  % show tabs within strings adding particular underscores
+%     stringstyle=\color{cdpurple},     % string literal style
+%     tabsize=4,	                   % sets default tabsize to 2 spaces
+%     title=\lstname,                   % show the filename of files included with \lstinputlisting; also try caption instead of title
+% }
+
+% \lstdefinestyle{tie}{
+%     language=verilog,
+%     morekeywords={
+%         % Extracted from https://www.vim.org/scripts/script.php?script_id=1964
+%         state,regfile,immediate_range,
+%         table,
+%         interface,
+%         operation,
+%         schedule,semantic,length,
+%         format,slot,slot_opcodes,import_wire,
+%         queue,ctype,proto,user_register,coprocessor,
+%         function,field,opcode,operand,iclass,reference,
+%         add_read_write,assign,core,immediate,
+%         in,inout,Inst,InstBuf,MEM,out,wire,
+%         export,
+%         VAddr,
+%         MemDataIn128,MemDataIn64,MemDataIn32,
+%         MemDataIn16,MemDataIn8,
+%         MemDataOut128,MemDataOut64,MemDataOut32,
+%         MemDataOut16,MemDataOut8,
+%         LoadByteDisable,StoreByteDisable,
+%         shared,slot_shared,
+%         lookup,imap,
+%         TIEadd,TIEaddn,TIEcmp,TIEcsa,TIEmac,
+%         TIEmul,TIEmulpp,TIEmux,TIEpsel,TIEsel,
+%         TIEprint,
+%         PIFReadDataBits,PIFWriteDataBits,
+%         IsaMemoryOrder,IsaUseBooleans,IsaCoprocessorCount,
+%     },
+%     moredelim=[is][\bfseries]{\$\$\$}{\$\$\$},
+% }
+
+% \newdateformat{germandate}{\THEDAY.~\monthname[\THEMONTH] \THEYEAR} % deutsches Datumsformat
+
+% \newcommand{\question}[1]{\noindent\textit{#1}\\}
+% \newcommand{\answer}[1]{\vspace{-1.5em}\begin{oframed}#1\end{oframed}}
+
+
+% STYLE.STY
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{style}[2024/05/20 Custom styling for the report]
+
+% --- Required Packages for Styling ---
+\usepackage{xcolor}
+%\usepackage{KOMA-Script}
+\usepackage{setspace}
+\usepackage{enumitem}
+
+% --- Color Definitions ---
+% Colors for listings and links
+\definecolor{tudblau}{RGB}{0, 68, 121}
+\definecolor{tudrot}{RGB}{180, 30, 40}
+\definecolor{cdgreen}{rgb}{0,0.6,0}
+\definecolor{cddarkblue}{rgb}{0,0,0.6}
+\definecolor{cdpurple}{rgb}{0.58,0,0.82}
+
+% --- Page Layout and Spacing ---
+\KOMAoptions{parskip=half-} % Use vertical space between paragraphs instead of indentation
+\onehalfspacing              % Set line spacing to 1.5 for better readability
+
+% --- List Customization ---
+% Change itemize bullets to a more professional em-dash
+\setlist[itemize,1]{label=\textendash}
+\setlist[itemize,2]{label=--}
+\setlist[itemize,3]{label=*}
+
+% --- Listings Configuration ---
+% \lstset{
+%     numbers=left,
+%     stepnumber=1,
+%     firstnumber=1,
+%     numberfirstline=true,
+%     basicstyle=\ttfamily\small,      % Use a smaller tt font for code
+%     breakatwhitespace=false,
+%     breaklines=true,
+%     captionpos=b,
+%     commentstyle=\color{cdgreen},
+%     escapeinside={\%*(}{*)},
+%     emphstyle=\bfseries,
+%     language=Python,
+%     moredelim=[is][\bfseries]{\$\$\$}{\$\$\$},
+%     frame=single,
+%     framerule=0.4pt,                 % Thinner frame rule
+%     rulecolor=\color{black},
+%     keepspaces=true,
+%     keywordstyle=\color{cddarkblue},
+%     showstringspaces=false,
+%     stringstyle=\color{cdpurple},
+%     tabsize=4,
+%     title=\lstname,
+% }
+
+% You can add other global style commands here
+
+\endinput

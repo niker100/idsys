@@ -1,0 +1,151 @@
+\tikzset{
+  annotated cuboid/.pic={
+    \tikzset{%
+      every edge quotes/.append style={midway, auto},
+      /cuboid/.cd,
+      #1
+    }
+    \draw [every edge/.append style={pic actions, densely dashed, opacity=.5}, pic actions]
+    (0,0,0) coordinate (o) -- ++(-\cubescale*\cubex,0,0) coordinate (a) -- ++(0,-\cubescale*\cubey,0) coordinate (b) edge coordinate [pos=1] (g) ++(0,0,-\cubescale*\cubez)  -- ++(\cubescale*\cubex,0,0) coordinate (c) -- cycle
+    (o) -- ++(0,0,-\cubescale*\cubez) coordinate (d) -- ++(0,-\cubescale*\cubey,0) coordinate (e) edge (g) -- (c) -- cycle
+    (o) -- (a) -- ++(0,0,-\cubescale*\cubez) coordinate (f) edge (g) -- (d) -- cycle;
+    \path [every edge/.append style={pic actions, |-|}]
+    (b) +(0,-5pt) coordinate (b1) edge ["\cubexlabel"'] (b1 -| c)
+    (b) +(-5pt,0) coordinate (b2) edge ["\cubeylabel"] (b2 |- a)
+    (c) +(3.5pt,-3.5pt) coordinate (c2) edge ["\cubezlabel"'] ([xshift=3.5pt,yshift=-3.5pt]e)
+    ;
+  },
+  /cuboid/.search also={/tikz},
+  /cuboid/.cd,
+  width/.store in=\cubex,
+  height/.store in=\cubey,
+  depth/.store in=\cubez,
+  units/.store in=\cubeunits,
+  scale/.store in=\cubescale,
+  xlabel/.store in=\cubexlabel,
+  ylabel/.store in=\cubeylabel,
+  zlabel/.store in=\cubezlabel,
+  width=10,
+  height=10,
+  depth=10,
+  units=cm,
+  scale=.1,
+}
+
+\tikzset{
+    id/.pic={
+    \tikzset{%
+    every edge quotes/.append style = {midway, auto},
+    /id/.cd,
+    #1}
+    \coordinate (o) at (0,0) {};
+    \coordinate (a) at (.6*\rectx, \recty) {};
+    \coordinate (b) at (-.4*\rectx,\recty) {};
+    \coordinate (c) at (-\rectx, 0) {};
+    \draw [every edge/.append style={pic actions, densely dashed, opacity=.5}, pic actions]
+    (o) -- (a) --(b) -- (c) -- cycle;
+    \path [every edge/.append style={pic actions, |-|}]
+    (c) +(0,-5pt) coordinate (b1) edge ["\rectxlabel"'] (b1 -| o)
+    (a) +(3.5pt,-3.5pt) coordinate (c2) edge ["\rectylabel", left] ([xshift=3.5pt,yshift=-3.5pt]o)
+    ;
+    \path (-0.2*\rectx, 0.5*\recty) node {\idname};
+    },
+    /id/.search also = {/tikz},
+    /id/.cd,
+    width/.store in=\rectx,
+    height/.store in=\recty,
+    xlabel/.store in=\rectxlabel,
+    ylabel/.store in=\rectylabel,
+    idname/.store in=\idname,
+    width=10,
+    height=10,
+    idname={},
+}
+
+\tikzset{
+    fec/.pic={
+    \tikzset{%
+    every edge quotes/.append style = {midway, auto},
+    /fec/.cd,
+    #1}
+    \coordinate (o) at (0,0) {};
+    \coordinate (a) at (.9*\rectx, \recty) {};
+    \coordinate (b) at (-.1*\rectx,\recty) {};
+    \coordinate (c) at (-\rectx, 0) {};
+    \draw [every edge/.append style={pic actions, densely dashed, opacity=.5}, pic actions]
+    (o) -- (a) --(b) -- (c) -- cycle;
+    \path [every edge/.append style={pic actions, |-|}]
+    (c) +(0,-5pt) coordinate (b1) edge ["\rectxlabel"'] (b1 -| o)
+    (a) +(3.5pt,-3.5pt) coordinate (c2) edge ["\rectylabel", left] ([xshift=3.5pt,yshift=-3.5pt]o)
+    ;
+    \path (-0.05*\rectx, 0.5*\recty) node {\idname};
+    },
+    /fec/.search also = {/tikz},
+    /fec/.cd,
+    width/.store in=\rectx,
+    height/.store in=\recty,
+    xlabel/.store in=\rectxlabel,
+    ylabel/.store in=\rectylabel,
+    idname/.store in=\idname,
+    width=10,
+    height=10,
+    idname={},
+}
+
+\tikzset{
+    tag/.pic={
+    \tikzset{%
+    every edge quotes/.append style = {midway, auto},
+    /tag/.cd,
+    #1}
+    \coordinate (o) at (0,0) {};
+    \coordinate (a) at (.09*\rectx, \recty) {};
+    \coordinate (b) at (-.91*\rectx,\recty) {};
+    \coordinate (c) at (-\rectx, 0) {};
+    \draw [every edge/.append style={pic actions, densely dashed, opacity=.5}, pic actions]
+    (o) -- (a) --(b) -- (c) -- cycle;
+    \path [every edge/.append style={pic actions, |-|}]
+    (c) +(0,-5pt) coordinate (b1) edge ["\rectxlabel"'] (b1 -| o)
+    (a) +(3.5pt,-3.5pt) coordinate (c2) edge ["\rectylabel", left] ([xshift=3.5pt,yshift=-3.5pt]o)
+    ;
+    },
+    /tag/.search also = {/tikz},
+    /tag/.cd,
+    width/.store in=\rectx,
+    height/.store in=\recty,
+    xlabel/.store in=\rectxlabel,
+    ylabel/.store in=\rectylabel,
+    width=10,
+    height=10,
+}
+
+Schaubild
+\usetikzlibrary {shapes, quotes, arrows.meta}
+% \begin{tikzpicture}
+%     \node[rectangle split, rectangle split parts = 5, draw , xslant = 1, rectangle split empty part height = 1cm , rectangle split empty part width = 5 cm, scale = 0.5] at (0,2) {};
+%   %\draw [xslant = 1] (0,-10) rectangle (3,2) ;
+% \end{tikzpicture}
+
+\begin{tikzpicture}[every edge quotes/.append style={auto}]
+    \pic at (5.5,0) {annotated cuboid= {width=300, height=100, depth=500, scale=.01, units = m, xlabel = q, ylabel = N, zlabel = $n_\text{ID}$}};
+
+    \draw[->] (4,-2.2) -- (.3,-4.5);
+    \draw[->] (4,-2.2) -- (8.3,-4.5);
+    
+    \pic at (0,-7) {id= {width = 3, height = 2, xlabel = q, ylabel = $n_\text{ID}$, idname = $\boldsymbol{a}$}};
+    \pic at (8,-7) {id= {width = 3, height = 2, xlabel = q, ylabel = $n_\text{ID}$, idname = $\boldsymbol{b}$}};
+
+    \draw[->] (-1.5,-8.2) -- (-1.5,-10.5);
+    \draw[->] (7.5,-8.2) -- (7.5,-10.5);
+    
+    \pic at (0,-14) {fec= {width = 3, height = 3, xlabel = q, ylabel = hm, idname = $c(\boldsymbol{a})$}};
+    \pic at (8,-14) {fec= {width = 3, height = 3, xlabel = q, ylabel = hm, idname = $c(\boldsymbol{b})$}};
+
+    \draw[->] (-1.5,-15.2) -- (-1.5,-17.5);
+    \draw[->] (7.5,-15.2) -- (7.5,-17.5);
+    
+    \pic at (0,-18) {tag= {width = 3, height = .3, xlabel = q, ylabel = 1}};
+    \pic at (8,-18) {tag= {width = 3, height = .3, xlabel = q, ylabel = 1}};
+
+    
+\end{tikzpicture}

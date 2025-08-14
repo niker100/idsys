@@ -1,0 +1,312 @@
+@article{Codes_for_ID_Tutorial,
+	title = {Codes for Identification via Channels: Tutorial for Communications Generalists},
+	issn = {1553-877X},
+	url = {https://ieeexplore.ieee.org/document/11036769},
+	doi = {10.1109/COMST.2025.3579815},
+	shorttitle = {Codes for Identification via Channels},
+	abstract = {Identification via channels ({ID}) is a communication problem in which a receiver tries to discern whether a received message matches a previously selected message. With identification, the receiver tries to answer the yes-no question “Is this my message?"; whereas, with message transmission, the receiver tries to answer the question “What message is this?", which has many possible answers. Information and coding theory show that for identification, specialized codes can achieve efficiency gains of an exponential order compared to full transmission of messages. This tutorial gives an introduction to identification via channels and to codes for identification via channels, for communication generalists with an interest in this traction-gaining topic. Specifically, a receiver can identify a message reliably from a received noisy-{ID} codeword. A noisy-{ID} codeword can be constructed by concatenating a linear block code that mitigates channel distortion with a noiseless-{ID} codeword that encodes a message efficiently for reliable identification. Noiseless-{ID} codes can be implemented as tagging codes or constant-weight codes that both guarantee low collision probabilities due to the distance properties of their underlying linear codes, such as Reed-Solomon codes, Reed-Muller codes, or random linear codes. We revisit and explain the close relationship between noiseless-{ID} codes and universal hash functions. {ID} is a ubiquitous communication problem and is relevant to all scenarios where two parties aim to determine whether two pieces of data are exactly identical. Specific non-cryptographic use cases include determining data integrity and state consistency in digital twins. While existing comprehensive tutorial treatments of {ID} are targeted at an information theory readership, we provide the first comprehensive {ID} tutorial targeted at a generalist readership without an information theory background by explaining the abstract {ID} concepts from basic principles with extensive illustrations and examples.},
+	pages = {1--1},
+	journaltitle = {{IEEE} Communications Surveys \& Tutorials},
+	author = {von Lengerke, Caspar and Cabrera, Juan A. and Reisslein, Martin and Fitzek, Frank H.P.},
+	urldate = {2025-06-22},
+	date = {2025},
+	keywords = {Codes, Error probability, Symbols, Receivers, Channel estimation, Coding theory, Goal-oriented communication, Identification via channels, Linear codes, Noise measurement, Post-Shannon, Reliability, Semantic communication, Surveys, Tagging, Tutorials, Universal hashing},
+}
+
+@ARTICLE{ID_Codes_Topical_Review,
+  author={Lengerke, Caspar Von and Hefele, Alexander and Cabrera, Juan A. and Kosut, Oliver and Reisslein, Martin and Fitzek, Frank H. P.},
+  journal={IEEE Access}, 
+  title={Identification Codes: A Topical Review With Design Guidelines for Practical Systems}, 
+  year={2023},
+  volume={11},
+  number={},
+  pages={14961-14982},
+  keywords={Codes;Block codes;Error probability;Symbols;Wireless communication;Reed-Solomon codes;Object recognition;Beyond-Shannon communication;error probability;false-positive identification;goal-oriented communication;linear block code;identity verification;performance metrics},
+  doi={10.1109/ACCESS.2023.3244071}}
+
+@book{The_mathematical_theory_of_communication,
+	location = {Urbana},
+	title = {The mathematical theory of communication},
+	isbn = {978-0-252-72548-7},
+	publisher = {Univ. of Illinois Press},
+	author = {Shannon, Claude Elwood and Weaver, Warren},
+	date = {1998},
+	keywords = {Ballade, Mathematische Methode},
+}
+
+
+@inproceedings{von_lengerke_identification_2023,
+	title = {Identification Codes for Increased Reliability in Digital Twin Applications over Noisy Channels},
+	url = {https://ieeexplore.ieee.org/document/10271785},
+	doi = {10.1109/MetaCom57706.2023.00098},
+	abstract = {Identification ({ID}) codes offer a method to optimize the required traffic if the goal of the communication is message identification. This approach can drastically reduce traffic between digital twins and their real-world data sources. While previous investigations focused on noiseless {ID}, we find that the traffic reduction via {ID} over noisy channels offers additional benefits than previously considered. Specifically, every message bit that we do not need to transmit can instead be used as a redundant bit by forward error correction ({FEC}) codes to mitigate the effects of noisy channels. Therefore, reducing the required traffic corresponds to the possibility of increasing reliability in {ID} over noisy channels that benefit from additional {FEC} coding. Employing identification codes enables communication with some reliability that would not be possible using traditional message transmission at practical block lengths for low {SNR} communication channels. We find that errors introduced by {ID} codes are negligible when compared with the reliability gains introduced by the extra redundancy that can be added to the transmissions. For a fixed block length, employing {ID} codes enables the usage of lower {FEC} code rates, which cause a reduction in the error probability that corresponds to an improvement of 4 {dB} {SNR}. Furthermore, we propose a method to reduce traffic even further when transmitting multiple tags, by avoiding the transmission of all but one random position for the tag determination of {ID} codes.},
+	eventtitle = {2023 {IEEE} International Conference on Metaverse Computing, Networking and Applications ({MetaCom})},
+	pages = {550--557},
+	booktitle = {2023 {IEEE} International Conference on Metaverse Computing, Networking and Applications ({MetaCom})},
+	author = {von Lengerke, Caspar and Cabrera, Juan A. and Fitzek, Frank H. P.},
+	urldate = {2025-06-22},
+	date = {2023-06},
+	keywords = {Beyond-Shannon communication, Codes, Error probability, Goal-oriented communication, Digital twins, False-positive identification, Forward error correction, Identity verification, Metaverse, Performance metrics, Soft sensors, Termination of employment},
+	file = {Snapshot:C\:\\Users\\carol\\Zotero\\storage\\QU5WKVZB\\10271785.html:text/html},
+}
+
+@misc{ibrahim2021idcodes,
+  author       = {Kevin Ibrahim and David J. C. MacKay and Rüdiger Urbanke},
+  title        = {Code Constructions and Bounds for Identification via Channels},
+  howpublished = {\url{https://eprint.iacr.org/2021/876}},
+  year         = {2021},
+  note         = {Cryptology ePrint Archive, Report 2021/876}
+}
+
+
+@book{leastSquareProblems,
+  author       = {Lawson, Charles L. and Hanson, Richard J.},
+  title        = {Solving least squares problems},
+  publisher = {Classics in applied mathematics ; 15},
+  year         = {1995},
+  note         = {The referenced tutorial is available via the SLUB Dresden library catalog: https://katalog.slub-dresden.de/id/0-1603104844}
+}
+
+@InProceedings{renyiEntropy,
+author="Pliam, John O.",
+editor="Roy, Bimal
+and Okamoto, Eiji",
+title="On the Incomparability of Entropy and Marginal Guesswork in Brute-Force Attacks",
+booktitle="Progress in Cryptology ---INDOCRYPT 2000",
+year="2000",
+publisher="Springer Berlin Heidelberg",
+address="Berlin, Heidelberg",
+pages="67--79",
+abstract="We discuss measures of statistical uncertainty relevant to determining random values in cryptology. It is shown that unbalanced and self-similar Huffman trees have extremal properties with respect to these measures.Their corresponding probability distributions exhibit an unbounded gap between (Shannon)entropy and the logarithm of the minimum search space size necessary to be guaranteed a certain chance of success (called marginal guesswork). Thus, there can be no general inequality between them. We discuss the implications of this result in terms of the security of weak secrets against brute-force searching attacks, and also in terms of Shannon's uncertainty axioms.",
+isbn="978-3-540-44495-4"
+}
+
+@article{van_Erven_2014,
+   title={Rényi Divergence and Kullback-Leibler Divergence},
+   volume={60},
+   ISSN={1557-9654},
+   url={http://dx.doi.org/10.1109/TIT.2014.2320500},
+   DOI={10.1109/tit.2014.2320500},
+   number={7},
+   journal={IEEE Transactions on Information Theory},
+   publisher={Institute of Electrical and Electronics Engineers (IEEE)},
+   author={van Erven, Tim and Harremoes, Peter},
+   year={2014},
+   month=jul, pages={3797–3820} }
+
+
+@Article{deppe_ferrara_2020,
+AUTHOR = {Derebeyoğlu, Sencer and Deppe, Christian and Ferrara, Roberto},
+TITLE = {Performance Analysis of Identification Codes},
+JOURNAL = {Entropy},
+VOLUME = {22},
+YEAR = {2020},
+NUMBER = {10},
+ARTICLE-NUMBER = {1067},
+URL = {https://www.mdpi.com/1099-4300/22/10/1067},
+PubMedID = {33286836},
+ISSN = {1099-4300},
+ABSTRACT = {In this paper, we analyze the construction of identification codes. Identification codes are based on the question: “Is the message I have just received the one I am interested in?”, as opposed to Shannon’s transmission, where the receiver is interested in not only one, but any, message. The advantage of identification is that it allows rates growing double exponentially in the blocklength at the cost of not being able to decode every message, which might be beneficial in certain applications. We focus on a special identification code construction based on two concatenated Reed-Solomon codes and have a closer look at its implementation, analyzing the trade-offs of identification with respect to transmission and the trade-offs introduced by the computational cost of identification codes.},
+DOI = {10.3390/e22101067}
+}
+
+@article{cryptoHash,
+author = {Al-Kuwari, Saif and Davenport, James and Bradford, Russell},
+year = {2011},
+month = {01},
+pages = {565},
+title = {Cryptographic Hash Functions: Recent Design Trends and Security Notions.},
+volume = {2011},
+journal = {IACR Cryptology ePrint Archive}
+}
+
+@book{feller1968introduction,
+  title={An Introduction to Probability Theory and Its Applications},
+  author={Feller, William},
+  volume={1},
+  year={1968},
+  edition={3rd},
+  publisher={John Wiley \& Sons},
+  address={New York}
+}
+
+@book{steele2004cauchy,
+  title={The Cauchy-Schwarz Master Class: An Introduction to the Art of Mathematical Inequalities},
+  author={Steele, J. Michael},
+  year={2004},
+  publisher={Cambridge University Press},
+  address={Cambridge}
+}
+
+@book{cover2006elements,
+  title={Elements of Information Theory},
+  author={Cover, Thomas M. and Thomas, Joy A.},
+  year={2006},
+  edition={2nd},
+  publisher={John Wiley \& Sons},
+  address={Hoboken, NJ}
+}
+
+@article{renyi1961measures,
+  title={On measures of entropy and information},
+  author={R{\'e}nyi, Alfr{\'e}d},
+  journal={Proceedings of the Fourth Berkeley Symposium on Mathematical Statistics and Probability},
+  volume={1},
+  pages={547--561},
+  year={1961},
+  publisher={University of California Press}
+}
+
+@article{cachin1997entropy,
+  title={Entropy measures and unconditional security in cryptography},
+  author={Cachin, Christian},
+  journal={ETH Zurich, Department of Computer Science},
+  year={1997},
+  publisher={ETH Zurich}
+}
+
+@book{macwilliams1977theory,
+  title={The Theory of Error-Correcting Codes},
+  author={MacWilliams, Florence Jessie and Sloane, Neil James Alexander},
+  year={1977},
+  publisher={North-Holland Publishing Company},
+  address={Amsterdam}
+}
+
+@book{lidl1997finite,
+  title={Finite Fields},
+  author={Lidl, Rudolf and Niederreiter, Harald},
+  year={1997},
+  edition={2nd},
+  publisher={Cambridge University Press},
+  address={Cambridge}
+}
+
+@article{muller1954application,
+  title={Application of Boolean algebra to switching circuit design and to error detection},
+  author={Muller, David Eugene},
+  journal={Transactions of the IRE Professional Group on Electronic Computers},
+  volume={3},
+  number={3},
+  pages={6--12},
+  year={1954},
+  publisher={IEEE}
+}
+
+@book{menezes1996handbook,
+  title={Handbook of Applied Cryptography},
+  author={Menezes, Alfred J. and Van Oorschot, Paul C. and Vanstone, Scott A.},
+  year={1996},
+  publisher={CRC Press},
+  address={Boca Raton, FL}
+}
+
+
+@article{diaconis_methods_1989,
+	title = {Methods for Studying Coincidences},
+	volume = {84},
+	issn = {0162-1459},
+	url = {https://www.jstor.org/stable/2290058},
+	doi = {10.2307/2290058},
+	abstract = {This article illustrates basic statistical techniques for studying coincidences. These include data-gathering methods (informal anecdotes, case studies, observational studies, and experiments) and methods of analysis (exploratory and confirmatory data analysis, special analytic techniques, and probabilistic modeling, both general and special purpose). We develop a version of the birthday problem general enough to include dependence, inhomogeneity, and almost and multiple matches. We review Fisher's techniques for giving partial credit for close matches. We develop a model for studying coincidences involving newly learned words. Once we set aside coincidences having apparent causes, four principles account for large numbers of remaining coincidences: hidden cause; psychology, including memory and perception; multiplicity of endpoints, including the counting of "close" or nearly alike events as if they were identical; and the law of truly large numbers, which says that when enormous numbers of events and people and their interactions cumulate over time, almost any outrageous event is bound to occur. These sources account for much of the force of synchronicity.},
+	pages = {853--861},
+	number = {408},
+	journaltitle = {Journal of the American Statistical Association},
+	author = {Diaconis, Persi and Mosteller, Frederick},
+	urldate = {2025-07-16},
+	date = {1989},
+	note = {Publisher: [American Statistical Association, Taylor \& Francis, Ltd.]},
+	file = {JSTOR Full Text PDF:C\:\\Users\\carol\\Zotero\\storage\\FK7TLQVI\\Diaconis und Mosteller - 1989 - Methods for Studying Coincidences.pdf:application/pdf},
+}
+
+@article{strinati2021beyondShannon,
+  author  = {Emilio Calvanese Strinati and Sergio Barbarossa},
+  title   = {6G Networks: Beyond Shannon Towards Semantic and Goal-Oriented Communications},
+  journal = {Computer Networks},
+  volume  = {190},
+  pages   = {107930},
+  year    = {2021},
+  doi     = {10.1016/j.comnet.2021.107930},
+}
+
+@INPROCEEDINGS{dobslaw2020boundary,
+  author={Dobslaw, Felix and de Oliveira Neto, Francisco Gomes and Feldt, Robert},
+  booktitle={2020 IEEE International Conference on Software Testing, Verification and Validation Workshops (ICSTW)}, 
+  title={Boundary Value Exploration for Software Analysis}, 
+  year={2020},
+  volume={},
+  number={},
+  pages={346-353},
+  keywords={Software;Tools;Software testing;Visualization;Measurement;Heating systems;boundary value analysis;boundary value testing;test diversity},
+  doi={10.1109/ICSTW50294.2020.00062}
+}
+
+@article{zimmermann1980osi,
+  author={Zimmermann, H.},
+  journal={IEEE Transactions on Communications}, 
+  title={OSI Reference Model - The ISO Model of Architecture for Open Systems Interconnection}, 
+  year={1980},
+  volume={28},
+  number={4},
+  pages={425-432},
+  keywords={Open systems;Standards development;ISO standards;Protocols;Computer networks;Computer architecture;Standards organizations;Computer aided manufacturing;Constitution;Standardization},
+  doi={10.1109/TCOM.1980.1094702}}
+
+@article{tu2023layered,
+  author  = {Tu, Zhenan},
+  title   = {Research on the Application of Layered Architecture in Computer Software Development},
+  journal = {Journal of Computing and Electronic Information Management},
+  volume  = {11},
+  number  = {3},
+  pages   = {34--38},
+  year    = {2023},
+  doi     = {10.54097/jceim.v11i3.08},
+}
+
+@online{ecidcodesLib,
+    url={https://pypi.org/project/ecidcodes/},
+    urldate = {2025-07-21},
+    author = {Ecologic Computing}
+}
+
+@misc{cisco2023annual,
+  author       = {{Cisco Systems}},
+  title        = {Cisco Annual Internet Report (2018--2023)},
+  year         = {2020},
+  howpublished = {\url{https://www.cisco.com/c/en/us/solutions/collateral/executive-perspectives/annual-internet-report/white-paper-c11-741490.html}},
+  note         = {Accessed: 2025-07-20}
+}
+
+@misc{cisco2018vni,
+  author       = {{Cisco Systems}},
+  title        = {Visual Networking Index: Forecast and Trends 2017--2022},
+  year         = {2018},
+  howpublished = {\url{https://www.cisco.com/c/en/us/solutions/service-provider/visual-networking-index-vni/index.html}},
+  note         = {Accessed: 2025-07-20}
+}
+
+@misc{edgeoptic2024traffic,
+  author       = {{EdgeOptic}},
+  title        = {Global Internet Traffic Growth Forecast: Looking Forward from 2024},
+  year         = {2024},
+  howpublished = {\url{https://edgeoptic.com/global-internet-traffic-growth-forecast-looking-forward-from-2024/}},
+  note         = {Accessed: 2025-07-20}
+}
+
+@article{Welford01081962,
+author = {B. P. Welford},
+title = {Note on a Method for Calculating Corrected Sums of Squares and Products},
+journal = {Technometrics},
+volume = {4},
+number = {3},
+pages = {419--420},
+year = {1962},
+publisher = {ASA Website},
+doi = {10.1080/00401706.1962.10490022},
+URL = {
+        https://www.tandfonline.com/doi/abs/10.1080/00401706.1962.10490022
+      },
+eprint = {
+        https://www.tandfonline.com/doi/pdf/10.1080/00401706.1962.10490022 
+}
+}

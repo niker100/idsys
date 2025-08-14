@@ -1,0 +1,100 @@
+
+
+% \documentclass[english,BCOR=4mm,cdfont=false]{tudscrreprt} %BCOR stellt die Bindekorrektur ein
+% \KOMAoptions{parskip = half-}
+% \iftutex
+% \usepackage{fontspec}
+% \else
+% \usepackage[T1]{fontenc}
+% \fi
+% \usepackage{babel}
+% \usepackage{isodate}
+% \usepackage{isodate}
+% \usepackage{svg}
+
+
+% \usepackage{style} % all packages stored in here
+
+% % --- TikZ und Zeichnungen ---
+% \usepackage{tikz}
+% \usetikzlibrary{
+%   positioning,
+%   calc,
+%   shapes,
+%   arrows.meta,  % Für moderne Pfeilspitzen (Latex, Stealth, etc.)
+%   shapes.multipart,
+%   fit           % Für group boxes
+% }
+
+% %\documentclass[11pt,a4paper]{article}
+% %\usepackage[left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+% \usepackage[onehalfspacing]{setspace}
+% \usepackage{graphicx} % Required for inserting images
+% \usepackage{pdfpages}
+% %\usepackage[T1]{fontenc}
+
+
+% \usepackage{amssymb,amsmath,amsthm, commath} % Diese Pakete sind nötig, um viele mathematische Formeln schreiben zu können.
+
+% \usepackage[sorting = none]{biblatex} %Imports biblatex package
+% \usepackage{csquotes}
+% \addbibresource{idsysev.bib}
+% %\bibliographystyle{%welchen sollen wir nehmen%}
+
+% \usepackage{enumerate} % Ein Paket um individuelle Aufzählungen erzeugen zu können.
+
+% \setlength\parindent{0em}
+
+% \usepackage{blindtext}
+% \usepackage{svg}
+
+% PREAMBLE.TEX
+
+% --- Core Setup ---
+
+\usepackage[utf8]{inputenc} % Set input encoding to UTF-8 (standard)
+\usepackage[T1]{fontenc}    % Use modern font encodings for PDF output
+\usepackage[english, german]{babel}          % Proper hyphenation and language-specific settings
+\usepackage{lmodern}        % Use the Latin Modern font
+\usepackage{hyphsubst}      % Improved hyphenation
+
+% --- Custom Style and Commands ---
+% All visual styling, colors, and layout tweaks are in style.sty
+\usepackage{style} 
+\include{custom_commands}
+
+% --- Math Packages ---
+\usepackage{amsmath}        % Advanced math environments
+\usepackage{amssymb}        % Extra math symbols
+\usepackage{mathtools}      % Further math tools, loads amsmath
+\usepackage{commath}        % For common math commands like \dif
+\usepackage{amsthm}         % For theorem and proof environments
+
+% --- Tables and Figures ---
+\usepackage{booktabs}       % For professional-quality tables
+\usepackage{longtable}      % For tables that span multiple pages
+\usepackage{tabulary}       % For tables with auto-adjusting column widths
+\usepackage{tabularx}
+\usepackage{graphicx}       % For including images
+\usepackage{pdfpages}       % For including PDF pages
+\usepackage{svg}            % For including SVG images
+\usepackage{subcaption}     % For subfigures
+
+% --- Document Utilities ---
+\usepackage{listings}       % For code listings
+\usepackage{csquotes}       % Context-sensitive quotation marks (required by biblatex)
+\usepackage[sorting=none]{biblatex} % For bibliography management
+\addbibresource{idsysev.bib}
+
+% --- Referencing and Links ---
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=tudblau,      % Defined in style.sty
+    citecolor=tudblau,
+    filecolor=tudrot,       % Defined in style.sty
+    urlcolor=tudblau,
+    pdftitle={Identification System Evaluation},
+    pdfpagemode=FullScreen,
+    linktoc=all             % Make links in ToC clickable
+}
