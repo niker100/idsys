@@ -22,8 +22,13 @@ IDSYS allows systematic analysis of these systems across different parameters in
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/idsys.git
+git clone https://github.com/niker100/idsys.git
 cd idsys
+
+### Installing Required Dependencies
+```bash
+# Install the native idcodes library
+sudo dpkg -i idcodeslibrary_0.2.8_amd64.deb || sudo apt -f install
 
 # Install dependencies
 pip install -r requirements.txt

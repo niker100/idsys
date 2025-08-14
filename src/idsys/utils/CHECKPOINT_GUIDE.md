@@ -14,7 +14,7 @@ This guide explains the approaches for saving analysis data periodically and res
 The easiest way to add resumable computation to your analysis scripts is using the provided checkpointing framework:
 
 ```python
-from framework.checkpoint import create_checkpoint_manager
+from idsys import create_checkpoint_manager
 
 # Create checkpoint manager
 checkpoint = create_checkpoint_manager(
@@ -57,7 +57,7 @@ for gf_exp in gf_exp_values:
         # Results were lost if script crashed here
 
 # After (with checkpointing)
-from framework.checkpoint import create_checkpoint_manager
+from idsys import create_checkpoint_manager
 
 checkpoint = create_checkpoint_manager("output", "my_analysis")
 
@@ -82,7 +82,7 @@ checkpoint.finalize_analysis()
 For even simpler integration:
 
 ```python
-from framework.migration_utils import quick_checkpoint_wrapper
+from idsys.utils.migration_utils import quick_checkpoint_wrapper
 
 def analyze_single_combination(params):
     """Your analysis logic for one parameter combination."""
@@ -147,7 +147,7 @@ if all_results:
 ### Step 1: Convert JSON Results to CSV
 
 ```python
-from framework.migration_utils import convert_json_to_csv
+from idsys.utils.migration_utils import convert_json_to_csv
 
 # Convert your existing JSON files
 convert_json_to_csv("analyses/gf_exp_influence/system_results.json")
@@ -262,7 +262,7 @@ plt.savefig('analysis_results.png')
 ```bash
 # Make sure you're in the correct directory
 cd /workspaces/idsys
-python -c "from framework.checkpoint import create_checkpoint_manager"
+python -c "from idsys import create_checkpoint_manager"
 ```
 
 **2. CSV file corruption**
