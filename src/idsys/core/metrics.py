@@ -4,7 +4,7 @@ Core metrics functionality for identification system evaluation.
 This module provides the main IdMetrics class for evaluating 
 identification system performance.
 
-Copyright (c) 2025 niker100
+Copyright (c) 2025 Nick Schubert
 Licensed under the MIT License - see LICENSE file for details
 """
 
