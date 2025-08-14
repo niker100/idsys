@@ -42,7 +42,8 @@ def run_analysis(patterns):
                 system=system,
                 message_pattern=pattern,
                 vec_len=vec_len,
-                num_messages=target_messages
+                num_messages=target_messages,
+                calculate_pdfs=True,  # Calculate PDFs for this pattern
             )
             pattern_results.append(result)
             
@@ -61,7 +62,7 @@ def calculate_renyi2_entropy(probs: List[float]) -> float:
         return 0.0
     return -np.log2(collision_prob)
 
-def process_and_save_results(all_results, patterns, systems, outdir="analyses/collision"):
+def process_and_save_results(all_results, patterns, systems, outdir="/output"):
     """
     Processes raw analysis results to calculate metrics (H_2, G_2),
     saves them to a CSV, and returns a processed DataFrame.
@@ -136,7 +137,7 @@ def process_and_save_results(all_results, patterns, systems, outdir="analyses/co
     return df
 
 
-def plot_results(processed_data, systems, outdir="analyses/collision"):
+def plot_results(processed_data, systems, outdir="/output"):
     """Plot the PDFs with empirical false positive rates and example messages from processed data."""
     os.makedirs(outdir, exist_ok=True)
     
@@ -214,13 +215,14 @@ if __name__ == "__main__":
     
     patterns = ["random", "incremental", "repeated_patterns", "sparse", "low_entropy", "only_two"]
     systems = ["RAW", "RSID", "RS2ID", "RMID", "SHA1ID", "SHA256ID"]
+    outdir = os.path.join(os.path.dirname(__file__), "output")
 
     # 1. Run the core analysis
     all_results = run_analysis(patterns)
     
     # 2. Process results, calculate metrics, and save to CSV
-    processed_data = process_and_save_results(all_results, patterns, systems)
+    processed_data = process_and_save_results(all_results, patterns, systems, outdir)
 
     # 3. Generate plots from the processed data
-    plot_results(processed_data, systems)
-    print("PDF plots saved in analyses/collision/")
+    plot_results(processed_data, systems, outdir)
+    print("PDF plots saved")

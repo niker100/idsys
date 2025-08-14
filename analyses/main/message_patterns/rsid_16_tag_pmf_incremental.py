@@ -2,11 +2,7 @@ import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-
-# Add framework path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-
-from framework import create_id_system, IdMetrics
+from idsys import create_id_system, IdMetrics
 
 def main():
     vec_len = 16
@@ -35,7 +31,7 @@ def main():
     plt.ylabel("Probability")
     plt.xlim(0, 2**16 - 1)
     plt.tight_layout()
-    plt.savefig("analyses/collision/rsid_tag_pdf_gf16_incremental.svg", format='svg')
+    plt.savefig("analyses/main/message_patterns/output/rsid_tag_pdf_gf16_incremental.svg", format='svg')
     plt.show()
 
 if __name__ == "__main__":

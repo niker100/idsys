@@ -479,7 +479,7 @@ if __name__ == "__main__":
     results_df = run_analysis_with_checkpointing()
     
     # Generate summary plots
-    generate_summary_plots(results_df)
+    # generate_summary_plots(results_df)
     
     # Display some example commands for analyzing results
     print("\n" + "="*80)
