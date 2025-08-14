@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import numpy as np
 import ast
+import base64
+from pathlib import Path
 
 # Load data from CSV
 benchmark_file = "multi_parameter_benchmark_results.csv"
@@ -13,11 +15,26 @@ benchmark_file = "multi_parameter_benchmark_results.csv"
 data = pd.read_csv(benchmark_file)
 
 # Expand dashboard to full width
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="IDSYS Dashboard", page_icon="🔍")
+
+# Helper function to display local images
+def get_image_base64(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception as e:
+        st.error(f"Failed to load image: {str(e)}")
+        return None
 
 # Add a sidebar for navigation
-dashboards = ["FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PMF & Example Explorer"]
-selected_dashboard = st.sidebar.radio("Select Dashboard:", dashboards)
+dashboards = ["Welcome to IDSYS", "FP Ratio in k Identification", "Execution Time vs. vec_len", "System Type Comparison", "PMF & Example Explorer"]
+selected_dashboard = st.sidebar.radio("Navigation:", dashboards)
+
+# GitHub repo link in sidebar
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Resources")
+st.sidebar.markdown("📊 [GitHub Repository](https://github.com/niker100/idsys)")
+st.sidebar.markdown("📄 [Documentation](https://github.com/niker100/idsys/blob/main/docs/Hauptseminar___ID_System_Evaluation__Report.pdf)")
 
 # Streamlit UI
 st.title("Identification Systems Dashboard")
@@ -29,11 +46,91 @@ pattern_explanations = {
     "repeated_patterns": "Messages consist of a short, repeating byte pattern (e.g., `[255, 0, 255, 0, ...]`, `[170, 187, 170, 187, ...]`).",
     "only_two": "Messages are constructed so only two unique messages exist, one of them is used at the sender and one at the receiver. This is used to test the consistency of tag generation",
     "low_entropy": "There is a limited alphabet `[0,1,2,3]` from which random symbols are picked to generate the messages.",
-    "sparse": "Messages are mostly zeros, with few non-zero byte (255) at a different positions in each message."
+    "sparse": "Messages are mostly zeros, with few non-zero byte (255) at a different positions in each message.",
 }
 
+# Handle Welcome page
+if selected_dashboard == "Welcome to IDSYS":
+    st.markdown("""
+
+    **Identification Systems Analysis Framework** - A comprehensive toolkit for evaluating identification coding schemes
+    
+    ## What is this dashboard about?
+    
+    This project evaluates noiseless identification (ID) systems, a method of goal-oriented communication, with a focus on ID tagging codes. These systems determine if a sender's and receiver's selected messages match by transmitting only a short tag,  which reduces bandwidth at the cost of potential errors.
+    Using a modular test framework developed in Python, we analyze various ID coding schemes and additional scenarios like k-Identification and multi-tag transmission, and assess system encoder performance under non-uniform message distributions.
+    """)
+
+    st.image("./pictures/ID_flow-Main Graph.drawio.svg", 
+            caption="Identification System Flow", 
+            use_container_width=True)
+
+    st.markdown("""
+        ## How It Works
+        
+        1. **Message Space**: Both sender and receiver operate on a shared, predefined message space, embedded in a Galois Field $\mathbb{F}$. This space contains $q^m$ unique messages, each of length $m$.
+        2. **Message Selection**: The sender selects the message it intends to send. Concurrently, the receiver chooses a candidate message, forming a hypothesis about the sender's choice.
+        3. **Encoding**: The sender's chosen message is transformed into a longer codeword. This step often uses an FEC code or hash function to improve the system's error resilience.
+        4. **Tag Extraction and Cue Formation**: A single symbol, the tag, and its position are extracted from the codeword. Together, these two pieces of information form the cue to be transmitted.
+        5. **Transmission and Tag Comparison**: The compact cue is sent over a noiseless channel. The receiver then compares the received tag with one generated from its own message to check for a match.
+        """)
+    
+
+    st.markdown("""
+    ## Systems Evaluated in IDSYS
+    
+    - **FEC-based**: Reed-Solomon (RSID), Concatenated Reed-Solomon (RS2ID) and Reed-Muller (RMID) provide a theoretical bound on the error probability due to their linearity and Hamming Distance guarantees.
+    - **Hash-based**: SHA1 (SHA1ID) and SHA256 (SHA256ID) use cryptographic hash functions to generate tags.
+    - **Baseline**: NoCode (RAW) implemented as baseline.
+    """)
+
+
+    st.markdown("""
+    ## Key Metrics
+    
+    - **False Positive Ratio**: Probability of accepting an incorrect message
+    - **Code Rate**: Ratio of useful information to total transmitted data
+    - **Execution Time**: Processing time for encoding/verification
+    - **Entropy Gain**: How well the system transforms message patterns into uniform tag distributions
+    """)
+    
+    st.markdown("""
+    
+    ## Explore Our Dashboard
+    
+    Use the navigation sidebar to explore:
+    
+    1. **FP Ratio** - Compare false positive rates between systems
+    2. **Execution Time** - See how performance scales with message length
+    3. **System Comparison** - Direct comparison of different identification approaches
+    4. **PMF Explorer** - Analyze message/tag probability distributions
+    
+    This dashboard is part of the [IDSYS framework](https://github.com/niker100/idsys), an open-source toolkit for identification system analysis.
+    """)
+    
+    st.markdown("---")
+    st.subheader("Quick Start with IDSYS")
+    
+    st.code("""
+    # Create an identification system
+    from idsys import create_id_system, generate_test_messages
+    
+    # Create a Reed-Solomon ID system
+    system = create_id_system("RSID", {"gf_exp": 8, "tag_pos": [2]})
+    
+    # Generate test messages
+    messages = generate_test_messages(vec_len=16, gf_exp=8, count=5)
+    
+    # Encode a message
+    message = messages[0]
+    tag = system.send(message)
+    
+    # Verify the message
+    is_valid = system.receive(tag, message)
+    """, language="python")
+
 # Handle PMF & Example Explorer separately (different layout)
-if selected_dashboard == "PMF & Example Explorer":
+elif selected_dashboard == "PMF & Example Explorer":
     # Load the PMF and examples CSV
     pdf_csv_path = "pdfs_and_examples.csv"
     
@@ -766,3 +863,11 @@ elif selected_dashboard == "System Type Comparison":
 # Add a footer with data info
 st.sidebar.markdown("---")
 st.sidebar.info(f"Data source: {os.path.basename(benchmark_file)}")
+
+# Add version info and attribution at the bottom of sidebar
+st.sidebar.markdown("---")
+st.sidebar.markdown("""
+**IDSYS v0.1.0**  
+© 2025 | Open Source Project  
+[MIT License](https://github.com/niker100/idsys/blob/main/LICENSE)
+""")
