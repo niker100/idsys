@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "idsys"
+version = "0.1.0"
+description = "ID System Evaluation Framework"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Your Name", email = "your.email@example.com" }]
+keywords = ["id-system", "evaluation", "dashboard"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12"
+]
+dependencies = [
+  "numpy", "matplotlib", "pytest", "pandas", "psutil", "tqdm", "streamlit", "altair", "ecidcodes",
+]
+
+[project.scripts]
+idsys = "idsys.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["idsys*"]
