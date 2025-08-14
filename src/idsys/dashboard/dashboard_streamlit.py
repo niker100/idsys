@@ -61,7 +61,7 @@ if selected_dashboard == "Welcome to IDSYS":
     Using a modular test framework developed in Python, we analyze various ID coding schemes and additional scenarios like k-Identification and multi-tag transmission, and assess system encoder performance under non-uniform message distributions.
     """)
 
-    st.image("./pictures/ID_flow-Main Graph.drawio.svg", 
+    st.image("./pictures/ID_flow-Main Graph.drawio.png", 
             caption="Identification System Flow", 
             use_container_width=True)
 
